@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CoiledTom Hub</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #03050f;
+      --bg2:     #070b1c;
+      --cyan:    #00eeff;
+      --purple:  #9b30ff;
+      --pink:    #ff2d78;
+      --text:    #bdd0f0;
+      --muted:   #3a4a6a;
+      --card:    rgba(8,14,32,0.9);
+      --glow-c:  0 0 18px rgba(0,238,255,0.5), 0 0 60px rgba(0,238,255,0.15);
+      --glow-p:  0 0 18px rgba(155,48,255,0.5), 0 0 60px rgba(155,48,255,0.15);
+      --glow-pk: 0 0 18px rgba(255,45,120,0.5), 0 0 60px rgba(255,45,120,0.15);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Exo 2', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── BACKGROUND ── */
+    .bg-layer {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    }
+    .bg-grid {
+      background-image:
+        linear-gradient(rgba(0,238,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,238,255,0.025) 1px, transparent 1px);
+      background-size: 44px 44px;
+      width: 100%; height: 100%;
+    }
+    .bg-glow {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 20% 10%, rgba(155,48,255,0.07) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 35% at 80% 80%, rgba(0,238,255,0.06) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 30% at 50% 50%, rgba(255,45,120,0.04) 0%, transparent 70%);
+    }
+    .bg-scan {
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 3px,
+        rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px
+      );
+      width: 100%; height: 100%;
+    }
+
+    /* ── WRAPPER ── */
+    .wrap {
+      position: relative; z-index: 1;
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 0 20px 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── HEADER ── */
+    header {
+      width: 100%;
+      text-align: center;
+      padding: 80px 0 56px;
+    }
+
+    .header-eyebrow {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 5px;
+      color: var(--cyan);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      opacity: 0;
+      animation: fadeUp 0.6s ease 0.1s forwards;
+    }
+
+    h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(1.8rem, 6vw, 3.2rem);
+      font-weight: 900;
+      line-height: 1.15;
+      letter-spacing: 2px;
+      opacity: 0;
+      animation: fadeUp 0.7s ease 0.25s forwards;
+    }
+
+    h1 .line1 { display: block; color: #fff; }
+    h1 .line2 {
+      display: block;
+      background: linear-gradient(90deg, var(--cyan), var(--purple), var(--pink));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 12px rgba(0,238,255,0.4));
+    }
+
+    .header-sub {
+      margin-top: 16px;
+      font-size: 0.95rem;
+      color: var(--muted);
+      letter-spacing: 1px;
+      opacity: 0;
+      animation: fadeUp 0.7s ease 0.4s forwards;
+    }
+
+    /* ── SECTION TITLE ── */
+    .section-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(1.1rem, 3vw, 1.5rem);
+      font-weight: 700;
+      color: #fff;
+      text-align: center;
+      letter-spacing: 3px;
+      margin-bottom: 40px;
+      position: relative;
+    }
+    .section-title::after {
+      content: '';
+      display: block;
+      width: 60px;
+      height: 2px;
+      background: linear-gradient(90deg, var(--cyan), var(--purple));
+      margin: 10px auto 0;
+      border-radius: 2px;
+    }
+
+    /* ── DIVIDER ── */
+    .divider {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0,238,255,0.2), transparent);
+      margin: 8px 0 48px;
+    }
+
+    /* ── BUTTON CARDS ── */
+    .btn-card {
+      width: 100%;
+      margin-bottom: 20px;
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    .btn-card.visible { opacity: 1; transform: translateY(0); }
+
+    .btn-link {
+      display: block;
+      width: 100%;
+      padding: 22px 28px;
+      border-radius: 10px;
+      text-decoration: none;
+      border: 1px solid rgba(0,238,255,0.18);
+      background: var(--card);
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+      cursor: pointer;
+    }
+
+    .btn-link::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(0,238,255,0.05), transparent 60%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .btn-link:hover::before { opacity: 1; }
+
+    .btn-link:hover {
+      transform: translateY(-3px);
+    }
+    .btn-link:active {
+      transform: scale(0.98) translateY(0);
+    }
+
+    /* ripple */
+    .btn-link .ripple {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      transform: scale(0);
+      animation: ripple 0.55s linear;
+      pointer-events: none;
+    }
+    @keyframes ripple {
+      to { transform: scale(4); opacity: 0; }
+    }
+
+    .btn-inner {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .btn-icon {
+      width: 44px; height: 44px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem;
+      flex-shrink: 0;
+    }
+
+    .btn-text-wrap { flex: 1; }
+
+    .btn-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .btn-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+      letter-spacing: 0.3px;
+      line-height: 1.4;
+    }
+
+    .btn-arrow {
+      font-size: 1rem;
+      opacity: 0.4;
+      transition: opacity 0.2s, transform 0.2s;
+      flex-shrink: 0;
+    }
+    .btn-link:hover .btn-arrow { opacity: 1; transform: translateX(4px); }
+
+    /* ── COLOR VARIANTS ── */
+    .v-cyan  { border-color: rgba(0,238,255,0.25); }
+    .v-cyan:hover  { box-shadow: var(--glow-c); border-color: rgba(0,238,255,0.6); }
+    .v-cyan .btn-icon  { background: rgba(0,238,255,0.1); color: var(--cyan); }
+    .v-cyan .btn-title { color: var(--cyan); }
+
+    .v-purple { border-color: rgba(155,48,255,0.25); }
+    .v-purple:hover { box-shadow: var(--glow-p); border-color: rgba(155,48,255,0.6); }
+    .v-purple .btn-icon { background: rgba(155,48,255,0.1); color: var(--purple); }
+    .v-purple .btn-title { color: var(--purple); }
+
+    .v-pink { border-color: rgba(255,45,120,0.25); }
+    .v-pink:hover { box-shadow: var(--glow-pk); border-color: rgba(255,45,120,0.6); }
+    .v-pink .btn-icon { background: rgba(255,45,120,0.1); color: var(--pink); }
+    .v-pink .btn-title { color: var(--pink); }
+
+    .v-multi { border-color: rgba(0,238,255,0.2); }
+    .v-multi:hover {
+      box-shadow: 0 0 18px rgba(155,48,255,0.4), 0 0 60px rgba(0,238,255,0.1);
+      border-color: rgba(155,48,255,0.5);
+    }
+    .v-multi .btn-icon {
+      background: linear-gradient(135deg, rgba(0,238,255,0.15), rgba(155,48,255,0.15));
+      color: #fff;
+    }
+    .v-multi .btn-title {
+      background: linear-gradient(90deg, var(--cyan), var(--purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      width: 100%;
+      text-align: center;
+      padding-top: 32px;
+      border-top: 1px solid rgba(0,238,255,0.08);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 2px;
+      color: var(--muted);
+    }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 480px) {
+      header { padding: 60px 0 40px; }
+      .btn-link { padding: 18px 18px; }
+      .btn-icon { width: 38px; height: 38px; font-size: 1.1rem; }
+      .btn-title { font-size: 0.78rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg-layer">
+  <div class="bg-grid"></div>
+  <div class="bg-glow"></div>
+  <div class="bg-scan"></div>
+</div>
+
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-eyebrow">▸ coiledtom · hub</div>
+    <h1>
+      <span class="line1">Scripts &amp;</span>
+      <span class="line2">Executor Atualizado</span>
+    </h1>
+    <p class="header-sub">Script &amp; Delta Executor</p>
+  </header>
+
+  <div class="divider"></div>
+
+  <div class="section-title">Acesse Agora</div>
+
+  <!-- BTN 1 — ShadowOps -->
+  <div class="btn-card">
+    <a href="https://coiledtom.github.io/Site-zeroday/" target="_blank" class="btn-link v-cyan" onclick="rippleEffect(event)">
+      <div class="btn-inner">
+        <div class="btn-icon">🌐</div>
+        <div class="btn-text-wrap">
+          <span class="btn-title">ShadowOps Site</span>
+          <span class="btn-sub">Site oficial do ShadowOps Scripts</span>
+        </div>
+        <span class="btn-arrow">→</span>
+      </div>
+    </a>
+  </div>
+
+  <!-- BTN 2 — Delta Executor -->
+  <div class="btn-card">
+    <a href="https://deltaexploits.gg/delta-executor-android" target="_blank" class="btn-link v-purple" onclick="rippleEffect(event)">
+      <div class="btn-inner">
+        <div class="btn-icon">⚡</div>
+        <div class="btn-text-wrap">
+          <span class="btn-title">Delta Executor Atualizado</span>
+          <span class="btn-sub">Site oficial do Delta Executor</span>
+        </div>
+        <span class="btn-arrow">→</span>
+      </div>
+    </a>
+  </div>
+
+  <!-- BTN 3 — Mais Scripts -->
+  <div class="btn-card">
+    <a href="https://linktr.ee/rocket_ws" target="_blank" class="btn-link v-pink" onclick="rippleEffect(event)">
+      <div class="btn-inner">
+        <div class="btn-icon">📦</div>
+        <div class="btn-text-wrap">
+          <span class="btn-title">Mais Scripts</span>
+          <span class="btn-sub">No site vai ter todos os scripts que eu já fiz ou divulguei</span>
+        </div>
+        <span class="btn-arrow">→</span>
+      </div>
+    </a>
+  </div>
+
+  <!-- BTN 4 — Discord -->
+  <div class="btn-card">
+    <a href="https://discord.gg/a74AySfcqa" target="_blank" class="btn-link v-multi" onclick="rippleEffect(event)">
+      <div class="btn-inner">
+        <div class="btn-icon">💬</div>
+        <div class="btn-text-wrap">
+          <span class="btn-title">Discord do CoiledTom Hub</span>
+          <span class="btn-sub">Entre na nossa comunidade</span>
+        </div>
+        <span class="btn-arrow">→</span>
+      </div>
+    </a>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    criador coiledtom
+  </footer>
+
+</div>
+
+<script>
+  // Scroll reveal
+  const cards = document.querySelectorAll('.btn-card');
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach((e, i) => {
+      if (e.isIntersecting) {
+        setTimeout(() => e.target.classList.add('visible'), i * 80);
+        obs.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.1 });
+
+  cards.forEach((c, i) => {
+    c.style.transitionDelay = `${i * 0.07}s`;
+    obs.observe(c);
+  });
+
+  // Ripple effect
+  function rippleEffect(e) {
+    const btn = e.currentTarget;
+    const circle = document.createElement('span');
+    const rect = btn.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height);
+    circle.classList.add('ripple');
+    circle.style.width = circle.style.height = size + 'px';
+    circle.style.left = (e.clientX - rect.left - size / 2) + 'px';
+    circle.style.top  = (e.clientY - rect.top  - size / 2) + 'px';
+    btn.appendChild(circle);
+    setTimeout(() => circle.remove(), 600);
+  }
+</script>
+</body>
+</html>
