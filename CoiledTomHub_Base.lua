@@ -6,13 +6,12 @@
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 -- ================================================
---               CONFIGURAÇÕES GLOBAIS
+--               CONFIGURACOES GLOBAIS
 -- ================================================
 
 local CONFIG = {
@@ -20,34 +19,31 @@ local CONFIG = {
     Version = "v1.0",
     HoldTime = 0.3,
     GuiSize = UDim2.new(0, 460, 0, 380),
-    GuiPosition = UDim2.new(0.5, -230, 0.5, -190),
     AnimSpeed = 0.25,
 }
 
--- Paleta de cores disponíveis
 local COLORS = {
-    Rosa    = Color3.fromRGB(255, 0, 140),
-    Azul    = Color3.fromRGB(0, 150, 255),
-    Vermelho= Color3.fromRGB(255, 50, 50),
-    Roxo    = Color3.fromRGB(160, 0, 255),
-    Amarelo = Color3.fromRGB(255, 220, 0),
-    Verde   = Color3.fromRGB(0, 220, 100),
-    Branco  = Color3.fromRGB(220, 220, 220),
+    Rosa     = Color3.fromRGB(255, 0, 140),
+    Azul     = Color3.fromRGB(0, 150, 255),
+    Vermelho = Color3.fromRGB(255, 50, 50),
+    Roxo     = Color3.fromRGB(160, 0, 255),
+    Amarelo  = Color3.fromRGB(255, 220, 0),
+    Verde    = Color3.fromRGB(0, 220, 100),
+    Branco   = Color3.fromRGB(220, 220, 220),
 }
 
-local currentAccent = COLORS.Rosa -- cor padrão
+local currentAccent = COLORS.Rosa
 
 -- ================================================
---               UTILITÁRIOS
+--               UTILITARIOS
 -- ================================================
 
 local function tween(obj, props, duration, style, direction)
-    local info = TweenInfo.new(
+    TweenService:Create(obj, TweenInfo.new(
         duration or CONFIG.AnimSpeed,
         style or Enum.EasingStyle.Quart,
         direction or Enum.EasingDirection.Out
-    )
-    TweenService:Create(obj, info, props):Play()
+    ), props):Play()
 end
 
 local function setCorner(parent, radius)
@@ -59,10 +55,10 @@ end
 
 local function setPadding(parent, top, bottom, left, right)
     local p = Instance.new("UIPadding")
-    p.PaddingTop = UDim.new(0, top or 6)
+    p.PaddingTop    = UDim.new(0, top    or 6)
     p.PaddingBottom = UDim.new(0, bottom or 6)
-    p.PaddingLeft = UDim.new(0, left or 8)
-    p.PaddingRight = UDim.new(0, right or 8)
+    p.PaddingLeft   = UDim.new(0, left   or 8)
+    p.PaddingRight  = UDim.new(0, right  or 8)
     p.Parent = parent
 end
 
@@ -80,11 +76,11 @@ local function newLabel(text, parent, size, pos, color, font)
     return lbl
 end
 
--- Registra todos os elementos para recolorir ao trocar tema
-local accentElements = {} -- {instance, property}
+-- Registro de elementos que mudam de cor com o tema
+local accentElements = {}
 
 local function registerAccent(instance, property)
-    table.insert(accentElements, {instance = instance, property = property})
+    table.insert(accentElements, { instance = instance, property = property })
     instance[property] = currentAccent
 end
 
@@ -92,13 +88,13 @@ local function applyAccentColor(color)
     currentAccent = color
     for _, e in ipairs(accentElements) do
         if e.instance and e.instance.Parent then
-            tween(e.instance, {[e.property] = color}, 0.3)
+            tween(e.instance, { [e.property] = color }, 0.3)
         end
     end
 end
 
 -- ================================================
---               CRIAÇÃO DA SCREENUI
+--               SCREENUI
 -- ================================================
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -116,23 +112,20 @@ ScreenGui.Parent = playerGui
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = CONFIG.GuiSize
-MainFrame.Position = CONFIG.GuiPosition
-MainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
-MainFrame.BorderSizePixel = 0
 MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
-setCorner(MainFrame, 12)
+setCorner(MainFrame, 14)
 
--- Stroke neon na borda
 local mainStroke = Instance.new("UIStroke")
 mainStroke.Thickness = 1.5
 mainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 registerAccent(mainStroke, "Color")
 mainStroke.Parent = MainFrame
 
--- Gradiente sutil de fundo
 local bgGrad = Instance.new("UIGradient")
 bgGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(18, 18, 24)),
@@ -142,105 +135,108 @@ bgGrad.Rotation = 135
 bgGrad.Parent = MainFrame
 
 -- ================================================
---               BARRA SUPERIOR (TOPBAR)
+--   TOPBAR — cor de acento, cantos arredondados
 -- ================================================
 
+-- A topbar e um frame colorido que ocupa altura 42px + 14px extra embaixo
+-- para esconder os cantos inferiores arredondados (ClipsDescendants do MainFrame faz o corte)
 local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
-TopBar.Size = UDim2.new(1, 0, 0, 42)
-TopBar.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
+TopBar.Size = UDim2.new(1, 0, 0, 56)   -- 42 visivel + 14 escondido embaixo
+TopBar.Position = UDim2.new(0, 0, 0, -14) -- sobe 14px para os cantos ficarem fora
+TopBar.BackgroundColor3 = currentAccent
 TopBar.BorderSizePixel = 0
 TopBar.ZIndex = 10
 TopBar.Parent = MainFrame
+setCorner(TopBar, 14)
+registerAccent(TopBar, "BackgroundColor3")
 
-local topBarStroke = Instance.new("UIStroke")
-topBarStroke.Thickness = 0
-topBarStroke.Parent = TopBar
+-- Icone Roblox na topbar
+local IconImg = Instance.new("ImageLabel")
+IconImg.Image = "rbxassetid://6023426915"
+IconImg.Size = UDim2.new(0, 22, 0, 22)
+IconImg.Position = UDim2.new(0, 12, 1, -33) -- alinhado na area visivel (offset do -14)
+IconImg.BackgroundTransparency = 1
+IconImg.ImageColor3 = Color3.fromRGB(255, 255, 255)
+IconImg.ZIndex = 12
+IconImg.Parent = TopBar
 
--- Linha inferior da topbar (acento)
-local TopAccentLine = Instance.new("Frame")
-TopAccentLine.Size = UDim2.new(1, 0, 0, 2)
-TopAccentLine.Position = UDim2.new(0, 0, 1, -2)
-TopAccentLine.BorderSizePixel = 0
-registerAccent(TopAccentLine, "BackgroundColor3")
-TopAccentLine.Parent = TopBar
-
--- Ícone decorativo
-local IconDot = Instance.new("Frame")
-IconDot.Size = UDim2.new(0, 10, 0, 10)
-IconDot.Position = UDim2.new(0, 14, 0.5, -5)
-IconDot.BorderSizePixel = 0
-registerAccent(IconDot, "BackgroundColor3")
-IconDot.Parent = TopBar
-setCorner(IconDot, 5)
-
--- Título
+-- Titulo
 local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Text = CONFIG.Title
-TitleLabel.Size = UDim2.new(0, 200, 1, 0)
-TitleLabel.Position = UDim2.new(0, 32, 0, 0)
+TitleLabel.Size = UDim2.new(0, 180, 0, 22)
+TitleLabel.Position = UDim2.new(0, 40, 1, -33)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.TextSize = 15
+TitleLabel.TextSize = 16
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.ZIndex = 12
 TitleLabel.Parent = TopBar
 
--- Versão
+-- Versao
 local VersionLabel = Instance.new("TextLabel")
 VersionLabel.Text = CONFIG.Version
-VersionLabel.Size = UDim2.new(0, 60, 1, 0)
-VersionLabel.Position = UDim2.new(0, 170, 0, 0)
+VersionLabel.Size = UDim2.new(0, 44, 0, 22)
+VersionLabel.Position = UDim2.new(0, 183, 1, -33)
 VersionLabel.BackgroundTransparency = 1
-VersionLabel.TextColor3 = Color3.fromRGB(120, 120, 140)
+VersionLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+VersionLabel.TextTransparency = 0.4
 VersionLabel.Font = Enum.Font.Gotham
 VersionLabel.TextSize = 11
 VersionLabel.TextXAlignment = Enum.TextXAlignment.Left
+VersionLabel.ZIndex = 12
 VersionLabel.Parent = TopBar
 
--- Botão X (fechar)
+-- Botao fechar
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Text = "✕"
-CloseBtn.Size = UDim2.new(0, 36, 0, 36)
-CloseBtn.Position = UDim2.new(1, -40, 0.5, -18)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(35, 30, 40)
-CloseBtn.TextColor3 = Color3.fromRGB(200, 200, 220)
+CloseBtn.Text = "x"
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -40, 1, -36)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+CloseBtn.BackgroundTransparency = 0.45
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextSize = 14
+CloseBtn.TextSize = 13
 CloseBtn.BorderSizePixel = 0
-CloseBtn.ZIndex = 11
+CloseBtn.ZIndex = 13
 CloseBtn.Parent = TopBar
 setCorner(CloseBtn, 8)
 
 CloseBtn.MouseEnter:Connect(function()
-    tween(CloseBtn, {BackgroundColor3 = Color3.fromRGB(200, 40, 60)}, 0.15)
+    tween(CloseBtn, { BackgroundTransparency = 0.1 }, 0.15)
 end)
 CloseBtn.MouseLeave:Connect(function()
-    tween(CloseBtn, {BackgroundColor3 = Color3.fromRGB(35, 30, 40)}, 0.15)
+    tween(CloseBtn, { BackgroundTransparency = 0.45 }, 0.15)
 end)
 CloseBtn.MouseButton1Click:Connect(function()
-    tween(MainFrame, {Size = UDim2.new(0, 460, 0, 0)}, 0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+    tween(MainFrame, { Size = UDim2.new(0, 460, 0, 0) }, 0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
     task.wait(0.22)
     ScreenGui.Enabled = false
     MainFrame.Size = CONFIG.GuiSize
 end)
 
--- Draggable (arrastar GUI)
-local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
+-- Draggable
+local dragging, dragStart, startPos = false, nil, nil
 TopBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        dragging  = true
         dragStart = input.Position
-        startPos = MainFrame.Position
+        startPos  = MainFrame.Position
     end
 end)
 TopBar.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
         dragging = false
     end
 end)
 UIS.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+    if dragging and (
+        input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch
+    ) then
         local delta = input.Position - dragStart
         MainFrame.Position = UDim2.new(
             startPos.X.Scale, startPos.X.Offset + delta.X,
@@ -253,10 +249,10 @@ end)
 --               ABAS (TABS)
 -- ================================================
 
-local tabNames = {"Aimbot", "Player", "Config"}
-local tabButtons = {}
+local tabNames    = { "Aimbot", "Player", "Config" }
+local tabButtons  = {}
 local tabContents = {}
-local activeTab = nil
+local activeTab   = nil
 
 local TabBar = Instance.new("Frame")
 TabBar.Name = "TabBar"
@@ -272,10 +268,8 @@ TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TabLayout.Padding = UDim.new(0, 2)
 TabLayout.Parent = TabBar
-
 setPadding(TabBar, 5, 5, 6, 6)
 
--- Área de conteúdo
 local ContentArea = Instance.new("Frame")
 ContentArea.Name = "ContentArea"
 ContentArea.Size = UDim2.new(1, 0, 1, -80)
@@ -287,17 +281,15 @@ ContentArea.Parent = MainFrame
 local function switchTab(name)
     if activeTab == name then return end
     activeTab = name
-
     for n, btn in pairs(tabButtons) do
         if n == name then
-            tween(btn, {BackgroundColor3 = currentAccent}, 0.18)
+            tween(btn, { BackgroundColor3 = currentAccent }, 0.18)
             btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         else
-            tween(btn, {BackgroundColor3 = Color3.fromRGB(22, 22, 30)}, 0.18)
+            tween(btn, { BackgroundColor3 = Color3.fromRGB(22, 22, 30) }, 0.18)
             btn.TextColor3 = Color3.fromRGB(160, 160, 180)
         end
     end
-
     for n, frame in pairs(tabContents) do
         frame.Visible = (n == name)
     end
@@ -334,7 +326,6 @@ for i, name in ipairs(tabNames) do
     contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
     contentLayout.Padding = UDim.new(0, 8)
     contentLayout.Parent = content
-
     setPadding(content, 10, 10, 14, 14)
 
     btn.MouseButton1Click:Connect(function()
@@ -343,7 +334,7 @@ for i, name in ipairs(tabNames) do
 end
 
 -- ================================================
---         COMPONENTES REUTILIZÁVEIS
+--         COMPONENTES REUTILIZAVEIS
 -- ================================================
 
 -- TOGGLE
@@ -363,9 +354,8 @@ local function createToggle(parent, labelText, defaultValue, callback, order)
     stroke.Color = Color3.fromRGB(40, 40, 55)
     stroke.Parent = row
 
-    local lbl = newLabel(labelText, row, UDim2.new(1, -56, 1, 0), UDim2.new(0, 12, 0, 0))
+    newLabel(labelText, row, UDim2.new(1, -56, 1, 0), UDim2.new(0, 12, 0, 0))
 
-    -- Track
     local track = Instance.new("Frame")
     track.Size = UDim2.new(0, 42, 0, 22)
     track.Position = UDim2.new(1, -52, 0.5, -11)
@@ -374,7 +364,6 @@ local function createToggle(parent, labelText, defaultValue, callback, order)
     track.Parent = row
     setCorner(track, 11)
 
-    -- Knob
     local knob = Instance.new("Frame")
     knob.Size = UDim2.new(0, 16, 0, 16)
     knob.Position = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
@@ -384,24 +373,21 @@ local function createToggle(parent, labelText, defaultValue, callback, order)
     knob.Parent = track
     setCorner(knob, 8)
 
-    if state then
-        track.BackgroundColor3 = currentAccent
-        registerAccent(track, "BackgroundColor3")
-    end
-
     local function updateToggle(newState)
         state = newState
         if state then
-            tween(track, {BackgroundColor3 = currentAccent}, 0.2)
-            tween(knob, {Position = UDim2.new(1, -19, 0.5, -8)}, 0.2)
-            if not table.find(accentElements, track) then
-                registerAccent(track, "BackgroundColor3")
+            tween(track, { BackgroundColor3 = currentAccent }, 0.2)
+            tween(knob, { Position = UDim2.new(1, -19, 0.5, -8) }, 0.2)
+            local found = false
+            for _, e in ipairs(accentElements) do
+                if e.instance == track then found = true break end
             end
+            if not found then registerAccent(track, "BackgroundColor3") end
         else
-            tween(track, {BackgroundColor3 = Color3.fromRGB(40, 40, 55)}, 0.2)
-            tween(knob, {Position = UDim2.new(0, 3, 0.5, -8)}, 0.2)
-            for i, e in ipairs(accentElements) do
-                if e.instance == track then table.remove(accentElements, i) break end
+            tween(track, { BackgroundColor3 = Color3.fromRGB(40, 40, 55) }, 0.2)
+            tween(knob, { Position = UDim2.new(0, 3, 0.5, -8) }, 0.2)
+            for i2, e in ipairs(accentElements) do
+                if e.instance == track then table.remove(accentElements, i2) break end
             end
         end
         if callback then callback(state) end
@@ -412,9 +398,7 @@ local function createToggle(parent, labelText, defaultValue, callback, order)
     clickBtn.BackgroundTransparency = 1
     clickBtn.Text = ""
     clickBtn.Parent = row
-    clickBtn.MouseButton1Click:Connect(function()
-        updateToggle(not state)
-    end)
+    clickBtn.MouseButton1Click:Connect(function() updateToggle(not state) end)
 
     updateToggle(state)
     return row, function() return state end
@@ -438,14 +422,12 @@ local function createSlider(parent, labelText, minVal, maxVal, defaultVal, callb
     stroke.Color = Color3.fromRGB(40, 40, 55)
     stroke.Parent = container
 
-    -- Header
     local headerFrame = Instance.new("Frame")
     headerFrame.Size = UDim2.new(1, 0, 0, 24)
-    headerFrame.Position = UDim2.new(0, 0, 0, 0)
     headerFrame.BackgroundTransparency = 1
     headerFrame.Parent = container
 
-    local lbl = newLabel(labelText, headerFrame, UDim2.new(0.7, 0, 1, 0), UDim2.new(0, 12, 0, 0))
+    newLabel(labelText, headerFrame, UDim2.new(0.7, 0, 1, 0), UDim2.new(0, 12, 0, 0))
 
     local valLabel = Instance.new("TextLabel")
     valLabel.Text = tostring(value)
@@ -459,7 +441,6 @@ local function createSlider(parent, labelText, minVal, maxVal, defaultVal, callb
     valLabel.Parent = headerFrame
     registerAccent(valLabel, "TextColor3")
 
-    -- Track bar
     local trackBg = Instance.new("Frame")
     trackBg.Size = UDim2.new(1, -24, 0, 6)
     trackBg.Position = UDim2.new(0, 12, 0, 36)
@@ -468,8 +449,9 @@ local function createSlider(parent, labelText, minVal, maxVal, defaultVal, callb
     trackBg.Parent = container
     setCorner(trackBg, 3)
 
-    local fill = Instance.new("Frame")
     local fillPct = (value - minVal) / (maxVal - minVal)
+
+    local fill = Instance.new("Frame")
     fill.Size = UDim2.new(fillPct, 0, 1, 0)
     fill.BackgroundColor3 = currentAccent
     fill.BorderSizePixel = 0
@@ -477,7 +459,6 @@ local function createSlider(parent, labelText, minVal, maxVal, defaultVal, callb
     setCorner(fill, 3)
     registerAccent(fill, "BackgroundColor3")
 
-    -- Handle
     local handle = Instance.new("Frame")
     handle.Size = UDim2.new(0, 14, 0, 14)
     handle.Position = UDim2.new(fillPct, -7, 0.5, -7)
@@ -487,10 +468,10 @@ local function createSlider(parent, labelText, minVal, maxVal, defaultVal, callb
     handle.Parent = trackBg
     setCorner(handle, 7)
 
-    local function updateSlider(inputPos)
-        local absPos = trackBg.AbsolutePosition.X
+    local function updateSlider(inputPosX)
+        local absPos  = trackBg.AbsolutePosition.X
         local absSize = trackBg.AbsoluteSize.X
-        local pct = math.clamp((inputPos - absPos) / absSize, 0, 1)
+        local pct = math.clamp((inputPosX - absPos) / absSize, 0, 1)
         local newVal = math.floor(minVal + (maxVal - minVal) * pct + 0.5)
         value = newVal
         fill.Size = UDim2.new(pct, 0, 1, 0)
@@ -508,18 +489,23 @@ local function createSlider(parent, labelText, minVal, maxVal, defaultVal, callb
     sliderBtn.Parent = container
 
     sliderBtn.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+        if inp.UserInputType == Enum.UserInputType.MouseButton1
+        or inp.UserInputType == Enum.UserInputType.Touch then
             draggingSlider = true
             updateSlider(inp.Position.X)
         end
     end)
     sliderBtn.InputEnded:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+        if inp.UserInputType == Enum.UserInputType.MouseButton1
+        or inp.UserInputType == Enum.UserInputType.Touch then
             draggingSlider = false
         end
     end)
     UIS.InputChanged:Connect(function(inp)
-        if draggingSlider and (inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch) then
+        if draggingSlider and (
+            inp.UserInputType == Enum.UserInputType.MouseMovement
+            or inp.UserInputType == Enum.UserInputType.Touch
+        ) then
             updateSlider(inp.Position.X)
         end
     end)
@@ -530,7 +516,7 @@ end
 -- DROPDOWN
 local function createDropdown(parent, labelText, options, defaultOption, callback, order)
     local selected = defaultOption or options[1]
-    local isOpen = false
+    local isOpen   = false
 
     local container = Instance.new("Frame")
     container.Size = UDim2.new(1, 0, 0, 38)
@@ -547,7 +533,7 @@ local function createDropdown(parent, labelText, options, defaultOption, callbac
     stroke.Color = Color3.fromRGB(40, 40, 55)
     stroke.Parent = container
 
-    local lbl = newLabel(labelText, container, UDim2.new(0.48, 0, 1, 0), UDim2.new(0, 12, 0, 0))
+    newLabel(labelText, container, UDim2.new(0.48, 0, 1, 0), UDim2.new(0, 12, 0, 0))
 
     local dropBtn = Instance.new("TextButton")
     dropBtn.Size = UDim2.new(0.48, 0, 0, 28)
@@ -556,7 +542,7 @@ local function createDropdown(parent, labelText, options, defaultOption, callbac
     dropBtn.TextColor3 = Color3.fromRGB(210, 210, 230)
     dropBtn.Font = Enum.Font.Gotham
     dropBtn.TextSize = 12
-    dropBtn.Text = selected .. "  ▾"
+    dropBtn.Text = selected .. "  v"
     dropBtn.BorderSizePixel = 0
     dropBtn.ZIndex = 6
     dropBtn.Parent = container
@@ -567,7 +553,6 @@ local function createDropdown(parent, labelText, options, defaultOption, callbac
     registerAccent(dropStroke, "Color")
     dropStroke.Parent = dropBtn
 
-    -- Painel de opções
     local optionPanel = Instance.new("Frame")
     optionPanel.Size = UDim2.new(0.48, 0, 0, #options * 28)
     optionPanel.Position = UDim2.new(0.52, 0, 1, 2)
@@ -588,7 +573,7 @@ local function createDropdown(parent, labelText, options, defaultOption, callbac
     optLayout.SortOrder = Enum.SortOrder.LayoutOrder
     optLayout.Parent = optionPanel
 
-    for i, opt in ipairs(options) do
+    for idx, opt in ipairs(options) do
         local optBtn = Instance.new("TextButton")
         optBtn.Size = UDim2.new(1, 0, 0, 28)
         optBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
@@ -597,19 +582,19 @@ local function createDropdown(parent, labelText, options, defaultOption, callbac
         optBtn.TextSize = 12
         optBtn.Text = opt
         optBtn.BorderSizePixel = 0
-        optBtn.LayoutOrder = i
+        optBtn.LayoutOrder = idx
         optBtn.ZIndex = 21
         optBtn.Parent = optionPanel
 
         optBtn.MouseEnter:Connect(function()
-            tween(optBtn, {BackgroundColor3 = Color3.fromRGB(35, 35, 50)}, 0.1)
+            tween(optBtn, { BackgroundColor3 = Color3.fromRGB(35, 35, 50) }, 0.1)
         end)
         optBtn.MouseLeave:Connect(function()
-            tween(optBtn, {BackgroundColor3 = Color3.fromRGB(22, 22, 32)}, 0.1)
+            tween(optBtn, { BackgroundColor3 = Color3.fromRGB(22, 22, 32) }, 0.1)
         end)
         optBtn.MouseButton1Click:Connect(function()
             selected = opt
-            dropBtn.Text = opt .. "  ▾"
+            dropBtn.Text = opt .. "  v"
             optionPanel.Visible = false
             isOpen = false
             container.ZIndex = 5
@@ -642,15 +627,15 @@ local function createButton(parent, labelText, callback, order)
     registerAccent(btn, "BackgroundColor3")
 
     btn.MouseEnter:Connect(function()
-        tween(btn, {BackgroundColor3 = btn.BackgroundColor3:Lerp(Color3.new(1,1,1), 0.15)}, 0.15)
+        tween(btn, { BackgroundColor3 = currentAccent:Lerp(Color3.new(1,1,1), 0.15) }, 0.15)
     end)
     btn.MouseLeave:Connect(function()
-        tween(btn, {BackgroundColor3 = currentAccent}, 0.15)
+        tween(btn, { BackgroundColor3 = currentAccent }, 0.15)
     end)
     btn.MouseButton1Click:Connect(function()
-        tween(btn, {Size = UDim2.new(0.97, 0, 0, 34)}, 0.08)
+        tween(btn, { Size = UDim2.new(0.97, 0, 0, 34) }, 0.08)
         task.wait(0.1)
-        tween(btn, {Size = UDim2.new(1, 0, 0, 36)}, 0.1)
+        tween(btn, { Size = UDim2.new(1, 0, 0, 36) }, 0.1)
         if callback then callback() end
     end)
 
@@ -694,36 +679,32 @@ end
 -- ================================================
 
 local aimbotContent = tabContents["Aimbot"]
-local aimbotValues = {}
+local aimbotValues  = {}
 
 createSection(aimbotContent, "TARGETING", 1)
 
-local _, getAimbot = createToggle(aimbotContent, "Enable Aimbot", false, function(v)
+createToggle(aimbotContent, "Enable Aimbot", false, function(v)
     aimbotValues.aimbot = v
-    print("[Aimbot] Enable:", v)
 end, 2)
 
-local _, getPrecision = createToggle(aimbotContent, "Precision Mode", false, function(v)
+createToggle(aimbotContent, "Precision Mode", false, function(v)
     aimbotValues.precision = v
-    print("[Aimbot] Precision:", v)
 end, 3)
 
-createSection(aimbotContent, "CONFIGURAÇÕES", 4)
+createSection(aimbotContent, "CONFIGURACOES", 4)
 
-local _, getAimType = createDropdown(aimbotContent, "Type Of Aim", {
+createDropdown(aimbotContent, "Type Of Aim", {
     "Silent Aim", "Mouse Aim", "Body Aim", "Head Aim"
 }, "Silent Aim", function(v)
     aimbotValues.aimType = v
-    print("[Aimbot] Type:", v)
 end, 5)
 
-local _, getSmooth = createSlider(aimbotContent, "Smoothness", 0, 100, 30, function(v)
+createSlider(aimbotContent, "Smoothness", 0, 100, 15, function(v)
     aimbotValues.smoothness = v
-    print("[Aimbot] Smoothness:", v)
 end, 6)
 
-createButton(aimbotContent, "⚡  Apply Aimbot", function()
-    print("[Aimbot] Applied! Values:", aimbotValues.aimbot, aimbotValues.aimType, aimbotValues.smoothness)
+createButton(aimbotContent, "Apply Aimbot", function()
+    print("[Aimbot] Aplicado:", aimbotValues.aimbot, aimbotValues.aimType, aimbotValues.smoothness)
 end, 7)
 
 -- ================================================
@@ -731,29 +712,22 @@ end, 7)
 -- ================================================
 
 local playerContent = tabContents["Player"]
-local playerValues = {}
+local playerValues  = {}
 
 createSection(playerContent, "MOVEMENT", 1)
 
-local _, getSpeed = createToggle(playerContent, "Speed Boost", false, function(v)
+createToggle(playerContent, "Speed Boost", false, function(v)
     playerValues.speedBoost = v
-    if v then
-        local char = player.Character
-        if char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then hum.WalkSpeed = playerValues.walkSpeed or 32 end
-        end
-    else
-        local char = player.Character
-        if char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then hum.WalkSpeed = 16 end
+    local char = player.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.WalkSpeed = v and (playerValues.walkSpeed or 32) or 16
         end
     end
-    print("[Player] SpeedBoost:", v)
 end, 2)
 
-local _, getWalkSpeed = createSlider(playerContent, "WalkSpeed", 16, 100, 32, function(v)
+createSlider(playerContent, "WalkSpeed", 16, 100, 32, function(v)
     playerValues.walkSpeed = v
     if playerValues.speedBoost then
         local char = player.Character
@@ -762,12 +736,11 @@ local _, getWalkSpeed = createSlider(playerContent, "WalkSpeed", 16, 100, 32, fu
             if hum then hum.WalkSpeed = v end
         end
     end
-    print("[Player] WalkSpeed:", v)
 end, 3)
 
-createSection(playerContent, "AÇÕES", 4)
+createSection(playerContent, "ACOES", 4)
 
-createButton(playerContent, "↺  Reset Player", function()
+createButton(playerContent, "Reset Player", function()
     local char = player.Character
     if char then
         local hum = char:FindFirstChildOfClass("Humanoid")
@@ -776,7 +749,6 @@ createButton(playerContent, "↺  Reset Player", function()
             hum.JumpPower = 50
         end
     end
-    print("[Player] Reset!")
 end, 5)
 
 -- ================================================
@@ -788,38 +760,36 @@ local configContent = tabContents["Config"]
 createSection(configContent, "TEMA DA INTERFACE", 1)
 
 local colorNames = {}
-for name, _ in pairs(COLORS) do
+for name in pairs(COLORS) do
     table.insert(colorNames, name)
 end
 table.sort(colorNames)
 
-local _, getThemeColor = createDropdown(configContent, "Cor do Tema", colorNames, "Rosa", function(v)
+createDropdown(configContent, "Cor do Tema", colorNames, "Rosa", function(v)
     local chosen = COLORS[v]
     if chosen then
         applyAccentColor(chosen)
-        -- Atualizar scrollbars
         for _, content in pairs(tabContents) do
             content.ScrollBarImageColor3 = chosen
         end
-        print("[Config] Tema alterado para:", v)
     end
 end, 2)
 
-createSection(configContent, "OPÇÕES", 3)
+createSection(configContent, "OPCOES", 3)
 
-createButton(configContent, "💾  Salvar Config", function()
-    print("[Config] Configurações salvas!")
+createButton(configContent, "Salvar Config", function()
+    print("[Config] Configuracoes salvas!")
 end, 4)
 
 -- ================================================
---           NOTIFICAÇÃO (TOAST)
+--           NOTIFICACAO (TOAST)
 -- ================================================
 
 local function showNotification(msg, duration)
     duration = duration or 2.5
     local toast = Instance.new("Frame")
-    toast.Size = UDim2.new(0, 240, 0, 40)
-    toast.Position = UDim2.new(0.5, -120, 1, 10)
+    toast.Size = UDim2.new(0, 260, 0, 42)
+    toast.Position = UDim2.new(0.5, -130, 1, 10)
     toast.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
     toast.BorderSizePixel = 0
     toast.ZIndex = 100
@@ -833,17 +803,26 @@ local function showNotification(msg, duration)
 
     local toastLine = Instance.new("Frame")
     toastLine.Size = UDim2.new(0, 3, 1, -12)
-    toastLine.Position = UDim2.new(0, 6, 0, 6)
+    toastLine.Position = UDim2.new(0, 7, 0, 6)
     toastLine.BackgroundColor3 = currentAccent
     toastLine.BorderSizePixel = 0
     toastLine.ZIndex = 101
     toastLine.Parent = toast
     setCorner(toastLine, 2)
 
+    local toastIcon = Instance.new("ImageLabel")
+    toastIcon.Image = "rbxassetid://6023426915"
+    toastIcon.Size = UDim2.new(0, 18, 0, 18)
+    toastIcon.Position = UDim2.new(0, 16, 0.5, -9)
+    toastIcon.BackgroundTransparency = 1
+    toastIcon.ImageColor3 = currentAccent
+    toastIcon.ZIndex = 101
+    toastIcon.Parent = toast
+
     local toastLabel = Instance.new("TextLabel")
     toastLabel.Text = msg
-    toastLabel.Size = UDim2.new(1, -20, 1, 0)
-    toastLabel.Position = UDim2.new(0, 16, 0, 0)
+    toastLabel.Size = UDim2.new(1, -44, 1, 0)
+    toastLabel.Position = UDim2.new(0, 40, 0, 0)
     toastLabel.BackgroundTransparency = 1
     toastLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
     toastLabel.Font = Enum.Font.Gotham
@@ -852,25 +831,24 @@ local function showNotification(msg, duration)
     toastLabel.ZIndex = 101
     toastLabel.Parent = toast
 
-    -- Slide in
-    tween(toast, {Position = UDim2.new(0.5, -120, 1, -52)}, 0.3)
+    tween(toast, { Position = UDim2.new(0.5, -130, 1, -54) }, 0.3)
     task.wait(duration)
-    tween(toast, {Position = UDim2.new(0.5, -120, 1, 10)}, 0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+    tween(toast, { Position = UDim2.new(0.5, -130, 1, 10) }, 0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
     task.wait(0.28)
     toast:Destroy()
 end
 
 -- ================================================
---           ANIMAÇÃO DE ABERTURA
+--           ANIMACAO DE ABERTURA
 -- ================================================
 
 local function openGui()
     ScreenGui.Enabled = true
     MainFrame.Size = UDim2.new(0, 460, 0, 0)
-    tween(MainFrame, {Size = CONFIG.GuiSize}, 0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    tween(MainFrame, { Size = CONFIG.GuiSize }, 0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
     switchTab("Aimbot")
     task.wait(0.4)
-    showNotification("CoiledTom Hub ativado!")
+    task.spawn(showNotification, "CoiledTom Hub ativado!")
 end
 
 -- ================================================
@@ -881,18 +859,16 @@ local touches = {}
 local holding = false
 
 local function countTouches()
-    local count = 0
-    for _ in pairs(touches) do count += 1 end
-    return count
+    local n = 0
+    for _ in pairs(touches) do n += 1 end
+    return n
 end
 
 UIS.TouchStarted:Connect(function(input)
     touches[input] = tick()
-
     if countTouches() >= 3 and not holding then
         holding = true
         local startTime = tick()
-
         task.spawn(function()
             while holding do
                 if countTouches() < 3 then
@@ -904,7 +880,7 @@ UIS.TouchStarted:Connect(function(input)
                     if not ScreenGui.Enabled then
                         openGui()
                     else
-                        tween(MainFrame, {Size = UDim2.new(0, 460, 0, 0)}, 0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+                        tween(MainFrame, { Size = UDim2.new(0, 460, 0, 0) }, 0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
                         task.wait(0.22)
                         ScreenGui.Enabled = false
                         MainFrame.Size = CONFIG.GuiSize
@@ -923,7 +899,7 @@ UIS.TouchEnded:Connect(function(input)
 end)
 
 -- ================================================
---       ATALHO TECLADO (TESTE EM PC): RightShift
+--       ATALHO PC (TESTE): RightShift
 -- ================================================
 
 UIS.InputBegan:Connect(function(input, gpe)
@@ -932,7 +908,7 @@ UIS.InputBegan:Connect(function(input, gpe)
         if not ScreenGui.Enabled then
             openGui()
         else
-            tween(MainFrame, {Size = UDim2.new(0, 460, 0, 0)}, 0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+            tween(MainFrame, { Size = UDim2.new(0, 460, 0, 0) }, 0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
             task.wait(0.22)
             ScreenGui.Enabled = false
             MainFrame.Size = CONFIG.GuiSize
@@ -941,5 +917,5 @@ UIS.InputBegan:Connect(function(input, gpe)
 end)
 
 -- ================================================
-print("[CoiledTom Hub] Carregado! Mobile: segure 3 dedos | PC: RightShift")
+print("[CoiledTom Hub] Carregado! Mobile: 3 dedos | PC: RightShift")
 -- ================================================
