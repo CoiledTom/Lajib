@@ -15,12 +15,16 @@ local playerGui = player:WaitForChild("PlayerGui")
 -- ================================================
 
 local CONFIG = {
-    Title = "CoiledTom Hub",
-    Version = "v1.0",
+    Title    = "CoiledTom Hub",
+    Version  = "v1.0",
     HoldTime = 0.3,
-    GuiSize = UDim2.new(0, 460, 0, 380),
+    -- Altura total = topbar (46) + corpo (334) = 380
+    TopbarH  = 46,
+    BodyH    = 334,
+    GuiW     = 460,
     AnimSpeed = 0.25,
 }
+CONFIG.GuiSize = UDim2.new(0, CONFIG.GuiW, 0, CONFIG.TopbarH + CONFIG.BodyH)
 
 local COLORS = {
     Rosa     = Color3.fromRGB(255, 0, 140),
@@ -76,7 +80,6 @@ local function newLabel(text, parent, size, pos, color, font)
     return lbl
 end
 
--- Registro de elementos que mudam de cor com o tema
 local accentElements = {}
 
 local function registerAccent(instance, property)
@@ -106,100 +109,128 @@ ScreenGui.IgnoreGuiInset = true
 ScreenGui.Parent = playerGui
 
 -- ================================================
---               FRAME PRINCIPAL
+--   CONTAINER PRINCIPAL (sem ClipsDescendants)
+--   Envolve topbar + corpo, permite bordas livres
 -- ================================================
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = CONFIG.GuiSize
-MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
-MainFrame.BorderSizePixel = 0
-MainFrame.ClipsDescendants = true
-MainFrame.Parent = ScreenGui
-setCorner(MainFrame, 14)
+local Container = Instance.new("Frame")
+Container.Name = "Container"
+Container.Size = CONFIG.GuiSize
+Container.AnchorPoint = Vector2.new(0.5, 0.5)
+Container.Position = UDim2.new(0.5, 0, 0.5, 0)
+Container.BackgroundTransparency = 1
+Container.BorderSizePixel = 0
+Container.Parent = ScreenGui
 
-local mainStroke = Instance.new("UIStroke")
-mainStroke.Thickness = 1.5
-mainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-registerAccent(mainStroke, "Color")
-mainStroke.Parent = MainFrame
+-- ================================================
+--   TOPBAR — frame proprio com cantos arredondados
+--   Fica por cima do corpo, sem ser cortada
+-- ================================================
 
+local TopBar = Instance.new("Frame")
+TopBar.Name = "TopBar"
+TopBar.Size = UDim2.new(1, 0, 0, CONFIG.TopbarH + 14) -- +14 para cobrir a juncao com o corpo
+TopBar.Position = UDim2.new(0, 0, 0, 0)
+TopBar.BackgroundColor3 = currentAccent
+TopBar.BorderSizePixel = 0
+TopBar.ZIndex = 12
+TopBar.ClipsDescendants = false
+TopBar.Parent = Container
+setCorner(TopBar, 14)  -- cantos arredondados nos 4 cantos; os inferiores ficam cobertos pelo corpo
+registerAccent(TopBar, "BackgroundColor3")
+
+-- ================================================
+--   CORPO DA GUI (fica abaixo, cobre cantos inf. da topbar)
+-- ================================================
+
+local BodyFrame = Instance.new("Frame")
+BodyFrame.Name = "BodyFrame"
+BodyFrame.Size = UDim2.new(1, 0, 0, CONFIG.BodyH + 14) -- +14 para cobrir o overlap
+BodyFrame.Position = UDim2.new(0, 0, 0, CONFIG.TopbarH) -- começa onde a topbar visivel termina
+BodyFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+BodyFrame.BorderSizePixel = 0
+BodyFrame.ZIndex = 10
+BodyFrame.ClipsDescendants = true  -- clips somente dentro do corpo
+BodyFrame.Parent = Container
+setCorner(BodyFrame, 14)  -- cantos arredondados nos 4; os sup. ficam cobertos pela topbar
+
+-- Gradiente de fundo sutil no corpo
 local bgGrad = Instance.new("UIGradient")
 bgGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(18, 18, 24)),
     ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 10, 14)),
 })
 bgGrad.Rotation = 135
-bgGrad.Parent = MainFrame
+bgGrad.Parent = BodyFrame
+
+-- Borda neon no container inteiro (stroke externo)
+-- Aplicada no topbar e no body separadamente para cobrir tudo
+local topStroke = Instance.new("UIStroke")
+topStroke.Thickness = 1.5
+topStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+topStroke.Transparency = 0.5
+registerAccent(topStroke, "Color")
+topStroke.Parent = TopBar
+
+local bodyStroke = Instance.new("UIStroke")
+bodyStroke.Thickness = 1.5
+bodyStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+registerAccent(bodyStroke, "Color")
+bodyStroke.Parent = BodyFrame
 
 -- ================================================
---   TOPBAR — cor de acento, cantos arredondados
+--   CONTEUDO DA TOPBAR
 -- ================================================
 
--- A topbar e um frame colorido que ocupa altura 42px + 14px extra embaixo
--- para esconder os cantos inferiores arredondados (ClipsDescendants do MainFrame faz o corte)
-local TopBar = Instance.new("Frame")
-TopBar.Name = "TopBar"
-TopBar.Size = UDim2.new(1, 0, 0, 56)   -- 42 visivel + 14 escondido embaixo
-TopBar.Position = UDim2.new(0, 0, 0, -14) -- sobe 14px para os cantos ficarem fora
-TopBar.BackgroundColor3 = currentAccent
-TopBar.BorderSizePixel = 0
-TopBar.ZIndex = 10
-TopBar.Parent = MainFrame
-setCorner(TopBar, 14)
-registerAccent(TopBar, "BackgroundColor3")
-
--- Icone Roblox na topbar
-local IconImg = Instance.new("ImageLabel")
-IconImg.Image = "rbxassetid://6023426915"
-IconImg.Size = UDim2.new(0, 22, 0, 22)
-IconImg.Position = UDim2.new(0, 12, 1, -33) -- alinhado na area visivel (offset do -14)
-IconImg.BackgroundTransparency = 1
-IconImg.ImageColor3 = Color3.fromRGB(255, 255, 255)
-IconImg.ZIndex = 12
-IconImg.Parent = TopBar
+-- Icone (bolinha colorida, igual screenshot)
+local IconDot = Instance.new("Frame")
+IconDot.Size = UDim2.new(0, 12, 0, 12)
+IconDot.Position = UDim2.new(0, 14, 0, 17)
+IconDot.BorderSizePixel = 0
+IconDot.ZIndex = 14
+IconDot.Parent = TopBar
+setCorner(IconDot, 6)
+registerAccent(IconDot, "BackgroundColor3")
 
 -- Titulo
 local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Text = CONFIG.Title
-TitleLabel.Size = UDim2.new(0, 180, 0, 22)
-TitleLabel.Position = UDim2.new(0, 40, 1, -33)
+TitleLabel.Size = UDim2.new(0, 180, 0, 26)
+TitleLabel.Position = UDim2.new(0, 32, 0, 10)
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextSize = 16
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-TitleLabel.ZIndex = 12
+TitleLabel.ZIndex = 14
 TitleLabel.Parent = TopBar
 
 -- Versao
 local VersionLabel = Instance.new("TextLabel")
 VersionLabel.Text = CONFIG.Version
-VersionLabel.Size = UDim2.new(0, 44, 0, 22)
-VersionLabel.Position = UDim2.new(0, 183, 1, -33)
+VersionLabel.Size = UDim2.new(0, 44, 0, 26)
+VersionLabel.Position = UDim2.new(0, 182, 0, 10)
 VersionLabel.BackgroundTransparency = 1
 VersionLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 VersionLabel.TextTransparency = 0.4
 VersionLabel.Font = Enum.Font.Gotham
 VersionLabel.TextSize = 11
 VersionLabel.TextXAlignment = Enum.TextXAlignment.Left
-VersionLabel.ZIndex = 12
+VersionLabel.ZIndex = 14
 VersionLabel.Parent = TopBar
 
--- Botao fechar
+-- Botao fechar — usa o simbolo "-" que renderiza em qualquer fonte Roblox
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Text = "x"
+CloseBtn.Text = "-"
 CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-CloseBtn.Position = UDim2.new(1, -40, 1, -36)
+CloseBtn.Position = UDim2.new(1, -40, 0, 8)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-CloseBtn.BackgroundTransparency = 0.45
+CloseBtn.BackgroundTransparency = 0.4
 CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextSize = 13
+CloseBtn.TextSize = 20
 CloseBtn.BorderSizePixel = 0
-CloseBtn.ZIndex = 13
+CloseBtn.ZIndex = 15
 CloseBtn.Parent = TopBar
 setCorner(CloseBtn, 8)
 
@@ -207,23 +238,24 @@ CloseBtn.MouseEnter:Connect(function()
     tween(CloseBtn, { BackgroundTransparency = 0.1 }, 0.15)
 end)
 CloseBtn.MouseLeave:Connect(function()
-    tween(CloseBtn, { BackgroundTransparency = 0.45 }, 0.15)
+    tween(CloseBtn, { BackgroundTransparency = 0.4 }, 0.15)
 end)
 CloseBtn.MouseButton1Click:Connect(function()
-    tween(MainFrame, { Size = UDim2.new(0, 460, 0, 0) }, 0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+    -- Anima fechando
+    tween(Container, { Size = UDim2.new(0, CONFIG.GuiW, 0, 0) }, 0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
     task.wait(0.22)
     ScreenGui.Enabled = false
-    MainFrame.Size = CONFIG.GuiSize
+    Container.Size = CONFIG.GuiSize
 end)
 
--- Draggable
+-- Draggable pela topbar
 local dragging, dragStart, startPos = false, nil, nil
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
     or input.UserInputType == Enum.UserInputType.Touch then
         dragging  = true
         dragStart = input.Position
-        startPos  = MainFrame.Position
+        startPos  = Container.Position
     end
 end)
 TopBar.InputEnded:Connect(function(input)
@@ -238,7 +270,7 @@ UIS.InputChanged:Connect(function(input)
         or input.UserInputType == Enum.UserInputType.Touch
     ) then
         local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(
+        Container.Position = UDim2.new(
             startPos.X.Scale, startPos.X.Offset + delta.X,
             startPos.Y.Scale, startPos.Y.Offset + delta.Y
         )
@@ -257,10 +289,11 @@ local activeTab   = nil
 local TabBar = Instance.new("Frame")
 TabBar.Name = "TabBar"
 TabBar.Size = UDim2.new(1, 0, 0, 36)
-TabBar.Position = UDim2.new(0, 0, 0, 42)
+TabBar.Position = UDim2.new(0, 0, 0, 14) -- 14 = offset do overlap
 TabBar.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 TabBar.BorderSizePixel = 0
-TabBar.Parent = MainFrame
+TabBar.ZIndex = 11
+TabBar.Parent = BodyFrame
 
 local TabLayout = Instance.new("UIListLayout")
 TabLayout.FillDirection = Enum.FillDirection.Horizontal
@@ -272,11 +305,12 @@ setPadding(TabBar, 5, 5, 6, 6)
 
 local ContentArea = Instance.new("Frame")
 ContentArea.Name = "ContentArea"
-ContentArea.Size = UDim2.new(1, 0, 1, -80)
-ContentArea.Position = UDim2.new(0, 0, 0, 80)
+ContentArea.Size = UDim2.new(1, 0, 1, -50)
+ContentArea.Position = UDim2.new(0, 0, 0, 50)
 ContentArea.BackgroundTransparency = 1
 ContentArea.ClipsDescendants = true
-ContentArea.Parent = MainFrame
+ContentArea.ZIndex = 11
+ContentArea.Parent = BodyFrame
 
 local function switchTab(name)
     if activeTab == name then return end
@@ -305,6 +339,7 @@ for i, name in ipairs(tabNames) do
     btn.TextSize = 13
     btn.BorderSizePixel = 0
     btn.LayoutOrder = i
+    btn.ZIndex = 12
     btn.Parent = TabBar
     setCorner(btn, 6)
     tabButtons[name] = btn
@@ -319,6 +354,7 @@ for i, name in ipairs(tabNames) do
     content.Visible = false
     content.CanvasSize = UDim2.new(0, 0, 0, 0)
     content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    content.ZIndex = 11
     content.Parent = ContentArea
     tabContents[name] = content
 
@@ -810,19 +846,10 @@ local function showNotification(msg, duration)
     toastLine.Parent = toast
     setCorner(toastLine, 2)
 
-    local toastIcon = Instance.new("ImageLabel")
-    toastIcon.Image = "rbxassetid://6023426915"
-    toastIcon.Size = UDim2.new(0, 18, 0, 18)
-    toastIcon.Position = UDim2.new(0, 16, 0.5, -9)
-    toastIcon.BackgroundTransparency = 1
-    toastIcon.ImageColor3 = currentAccent
-    toastIcon.ZIndex = 101
-    toastIcon.Parent = toast
-
     local toastLabel = Instance.new("TextLabel")
-    toastLabel.Text = msg
-    toastLabel.Size = UDim2.new(1, -44, 1, 0)
-    toastLabel.Position = UDim2.new(0, 40, 0, 0)
+    toastLabel.Text = "  " .. msg
+    toastLabel.Size = UDim2.new(1, -16, 1, 0)
+    toastLabel.Position = UDim2.new(0, 16, 0, 0)
     toastLabel.BackgroundTransparency = 1
     toastLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
     toastLabel.Font = Enum.Font.Gotham
@@ -844,8 +871,8 @@ end
 
 local function openGui()
     ScreenGui.Enabled = true
-    MainFrame.Size = UDim2.new(0, 460, 0, 0)
-    tween(MainFrame, { Size = CONFIG.GuiSize }, 0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    Container.Size = UDim2.new(0, CONFIG.GuiW, 0, 0)
+    tween(Container, { Size = CONFIG.GuiSize }, 0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
     switchTab("Aimbot")
     task.wait(0.4)
     task.spawn(showNotification, "CoiledTom Hub ativado!")
@@ -880,10 +907,10 @@ UIS.TouchStarted:Connect(function(input)
                     if not ScreenGui.Enabled then
                         openGui()
                     else
-                        tween(MainFrame, { Size = UDim2.new(0, 460, 0, 0) }, 0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+                        tween(Container, { Size = UDim2.new(0, CONFIG.GuiW, 0, 0) }, 0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
                         task.wait(0.22)
                         ScreenGui.Enabled = false
-                        MainFrame.Size = CONFIG.GuiSize
+                        Container.Size = CONFIG.GuiSize
                     end
                     return
                 end
@@ -908,10 +935,10 @@ UIS.InputBegan:Connect(function(input, gpe)
         if not ScreenGui.Enabled then
             openGui()
         else
-            tween(MainFrame, { Size = UDim2.new(0, 460, 0, 0) }, 0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+            tween(Container, { Size = UDim2.new(0, CONFIG.GuiW, 0, 0) }, 0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
             task.wait(0.22)
             ScreenGui.Enabled = false
-            MainFrame.Size = CONFIG.GuiSize
+            Container.Size = CONFIG.GuiSize
         end
     end
 end)
