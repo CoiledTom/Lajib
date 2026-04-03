@@ -145,8 +145,8 @@ registerAccent(TopBar, "BackgroundColor3")
 
 local BodyFrame = Instance.new("Frame")
 BodyFrame.Name = "BodyFrame"
-BodyFrame.Size = UDim2.new(1, 0, 0, CONFIG.BodyH + 20) -- +20 para cobrir o overlap generoso
-BodyFrame.Position = UDim2.new(0, 0, 0, CONFIG.TopbarH - 6) -- sobe 6px para eliminar gap
+BodyFrame.Size = UDim2.new(1, 0, 0, CONFIG.BodyH + 28) -- +28 para cobrir o overlap maior
+BodyFrame.Position = UDim2.new(0, 0, 0, CONFIG.TopbarH - 18) -- entra 18px dentro da topbar
 BodyFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
 BodyFrame.BorderSizePixel = 0
 BodyFrame.ZIndex = 10
@@ -289,7 +289,7 @@ local activeTab   = nil
 local TabBar = Instance.new("Frame")
 TabBar.Name = "TabBar"
 TabBar.Size = UDim2.new(1, 0, 0, 36)
-TabBar.Position = UDim2.new(0, 0, 0, 20) -- 20 = offset do overlap
+TabBar.Position = UDim2.new(0, 0, 0, 28) -- 28 = offset do overlap
 TabBar.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 TabBar.BorderSizePixel = 0
 TabBar.ZIndex = 11
@@ -686,7 +686,7 @@ end
 -- SECTION LABEL
 local function createSection(parent, text, order)
     local f = Instance.new("Frame")
-    f.Size = UDim2.new(1, 0, 0, 20)
+    f.Size = UDim2.new(1, 0, 0, 24)
     f.BackgroundTransparency = 1
     f.LayoutOrder = order or 0
     f.Parent = parent
@@ -698,18 +698,33 @@ local function createSection(parent, text, order)
     line.BorderSizePixel = 0
     line.Parent = f
 
+    -- Badge arredondado com borda colorida
+    local badge = Instance.new("Frame")
+    badge.Size = UDim2.new(0, 0, 1, 0)
+    badge.AutomaticSize = Enum.AutomaticSize.X
+    badge.Position = UDim2.new(0, 8, 0, 0)
+    badge.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+    badge.BorderSizePixel = 0
+    badge.ZIndex = 2
+    badge.Parent = f
+    setCorner(badge, 6)
+
+    local badgeStroke = Instance.new("UIStroke")
+    badgeStroke.Thickness = 1
+    registerAccent(badgeStroke, "Color")
+    badgeStroke.Parent = badge
+
     local lbl = Instance.new("TextLabel")
     lbl.Text = " " .. text .. " "
     lbl.Size = UDim2.new(0, 0, 1, 0)
     lbl.AutomaticSize = Enum.AutomaticSize.X
-    lbl.Position = UDim2.new(0, 8, 0, 0)
-    lbl.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+    lbl.BackgroundTransparency = 1
     lbl.TextColor3 = currentAccent
     lbl.Font = Enum.Font.GothamBold
     lbl.TextSize = 11
     lbl.TextXAlignment = Enum.TextXAlignment.Center
-    lbl.ZIndex = 2
-    lbl.Parent = f
+    lbl.ZIndex = 3
+    lbl.Parent = badge
     registerAccent(lbl, "TextColor3")
 
     return f
