@@ -20,7 +20,7 @@ local CONFIG = {
     HoldTime = 0.3,
     -- Altura total = topbar (46) + corpo (334) = 380
     TopbarH  = 46,
-    BodyH    = 334,
+    BodyH    = 390,
     GuiW     = 460,
     AnimSpeed = 0.25,
 }
@@ -288,11 +288,11 @@ local activeTab   = nil
 
 local TabBar = Instance.new("Frame")
 TabBar.Name = "TabBar"
-TabBar.Size = UDim2.new(1, 0, 0, 36)
-TabBar.Position = UDim2.new(0, 0, 0, 28) -- 28 = offset do overlap
+TabBar.Size = UDim2.new(1, 0, 0, 40)
+TabBar.Position = UDim2.new(0, 0, 0, 28)
 TabBar.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 TabBar.BorderSizePixel = 0
-TabBar.ZIndex = 11
+TabBar.ZIndex = 50
 TabBar.Parent = BodyFrame
 
 local TabLayout = Instance.new("UIListLayout")
@@ -305,8 +305,8 @@ setPadding(TabBar, 5, 5, 6, 6)
 
 local ContentArea = Instance.new("Frame")
 ContentArea.Name = "ContentArea"
-ContentArea.Size = UDim2.new(1, 0, 1, -50)
-ContentArea.Position = UDim2.new(0, 0, 0, 50)
+ContentArea.Size = UDim2.new(1, 0, 1, -70)
+ContentArea.Position = UDim2.new(0, 0, 0, 70)
 ContentArea.BackgroundTransparency = 1
 ContentArea.ClipsDescendants = true
 ContentArea.ZIndex = 11
@@ -339,7 +339,7 @@ for i, name in ipairs(tabNames) do
     btn.TextSize = 13
     btn.BorderSizePixel = 0
     btn.LayoutOrder = i
-    btn.ZIndex = 12
+    btn.ZIndex = 55
     btn.Parent = TabBar
     setCorner(btn, 6)
     tabButtons[name] = btn
