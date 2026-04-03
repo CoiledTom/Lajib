@@ -145,8 +145,8 @@ registerAccent(TopBar, "BackgroundColor3")
 
 local BodyFrame = Instance.new("Frame")
 BodyFrame.Name = "BodyFrame"
-BodyFrame.Size = UDim2.new(1, 0, 0, CONFIG.BodyH + 14) -- +14 para cobrir o overlap
-BodyFrame.Position = UDim2.new(0, 0, 0, CONFIG.TopbarH) -- começa onde a topbar visivel termina
+BodyFrame.Size = UDim2.new(1, 0, 0, CONFIG.BodyH + 20) -- +20 para cobrir o overlap generoso
+BodyFrame.Position = UDim2.new(0, 0, 0, CONFIG.TopbarH - 6) -- sobe 6px para eliminar gap
 BodyFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
 BodyFrame.BorderSizePixel = 0
 BodyFrame.ZIndex = 10
@@ -289,7 +289,7 @@ local activeTab   = nil
 local TabBar = Instance.new("Frame")
 TabBar.Name = "TabBar"
 TabBar.Size = UDim2.new(1, 0, 0, 36)
-TabBar.Position = UDim2.new(0, 0, 0, 14) -- 14 = offset do overlap
+TabBar.Position = UDim2.new(0, 0, 0, 20) -- 20 = offset do overlap
 TabBar.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 TabBar.BorderSizePixel = 0
 TabBar.ZIndex = 11
@@ -622,6 +622,11 @@ local function createDropdown(parent, labelText, options, defaultOption, callbac
         optBtn.ZIndex = 21
         optBtn.Parent = optionPanel
 
+        -- Arredonda primeiro e ultimo item para combinar com o painel
+        if idx == 1 or idx == #options then
+            setCorner(optBtn, 6)
+        end
+
         optBtn.MouseEnter:Connect(function()
             tween(optBtn, { BackgroundColor3 = Color3.fromRGB(35, 35, 50) }, 0.1)
         end)
@@ -879,11 +884,15 @@ local function openGui()
 end
 
 -- ================================================
---       SISTEMA DE GESTO SECRETO (3 DEDOS)
+--   SISTEMA DE GESTO: DUPLO TOQUE COM 3 DEDOS
+--   Detecta 2 toques rapidos com 3 dedos simultaneos
 -- ================================================
 
-local touches = {}
-local holding = false
+local touches       = {}
+local tapCount      = 0       -- quantos "grupos de 3 dedos" foram detectados
+local lastTapTime   = 0       -- tempo do ultimo tap valido
+local TAP_INTERVAL  = 0.4     -- janela maxima entre os dois taps (segundos)
+local TAP_FINGERS   = 3       -- dedos necessarios simultaneamente
 
 local function countTouches()
     local n = 0
@@ -891,38 +900,39 @@ local function countTouches()
     return n
 end
 
+local function toggleGui()
+    if not ScreenGui.Enabled then
+        openGui()
+    else
+        tween(Container, { Size = UDim2.new(0, CONFIG.GuiW, 0, 0) }, 0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+        task.wait(0.22)
+        ScreenGui.Enabled = false
+        Container.Size = CONFIG.GuiSize
+    end
+end
+
 UIS.TouchStarted:Connect(function(input)
     touches[input] = tick()
-    if countTouches() >= 3 and not holding then
-        holding = true
-        local startTime = tick()
-        task.spawn(function()
-            while holding do
-                if countTouches() < 3 then
-                    holding = false
-                    return
-                end
-                if tick() - startTime >= CONFIG.HoldTime then
-                    holding = false
-                    if not ScreenGui.Enabled then
-                        openGui()
-                    else
-                        tween(Container, { Size = UDim2.new(0, CONFIG.GuiW, 0, 0) }, 0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
-                        task.wait(0.22)
-                        ScreenGui.Enabled = false
-                        Container.Size = CONFIG.GuiSize
-                    end
-                    return
-                end
-                task.wait()
-            end
-        end)
+
+    -- Verifica se ha 3 dedos na tela ao mesmo tempo
+    if countTouches() == TAP_FINGERS then
+        local now = tick()
+
+        if now - lastTapTime <= TAP_INTERVAL then
+            -- Segundo tap detectado dentro do intervalo = duplo toque!
+            tapCount    = 0
+            lastTapTime = 0
+            toggleGui()
+        else
+            -- Primeiro tap — registra e aguarda o segundo
+            tapCount    = 1
+            lastTapTime = now
+        end
     end
 end)
 
 UIS.TouchEnded:Connect(function(input)
     touches[input] = nil
-    holding = false
 end)
 
 -- ================================================
@@ -932,17 +942,10 @@ end)
 UIS.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
-        if not ScreenGui.Enabled then
-            openGui()
-        else
-            tween(Container, { Size = UDim2.new(0, CONFIG.GuiW, 0, 0) }, 0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
-            task.wait(0.22)
-            ScreenGui.Enabled = false
-            Container.Size = CONFIG.GuiSize
-        end
+        toggleGui()
     end
 end)
 
 -- ================================================
-print("[CoiledTom Hub] Carregado! Mobile: 3 dedos | PC: RightShift")
+print("[CoiledTom Hub] Carregado! Mobile: duplo toque com 3 dedos | PC: RightShift")
 -- ================================================
