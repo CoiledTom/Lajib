@@ -295,6 +295,18 @@ TabBar.BorderSizePixel = 0
 TabBar.ZIndex = 50
 TabBar.Parent = BodyFrame
 
+-- Frame bloqueador: cobre toda a area acima do conteúdo (topbar overlap + tabbar)
+-- Impede que elementos scrollados apareçam sobre as abas
+local TabBlocker = Instance.new("Frame")
+TabBlocker.Name = "TabBlocker"
+TabBlocker.Size = UDim2.new(1, 0, 0, 70) -- mesma altura que o inicio do ContentArea
+TabBlocker.Position = UDim2.new(0, 0, 0, 0)
+TabBlocker.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+TabBlocker.BackgroundTransparency = 0
+TabBlocker.BorderSizePixel = 0
+TabBlocker.ZIndex = 45 -- abaixo do TabBar (50) mas acima do conteúdo (11)
+TabBlocker.Parent = BodyFrame
+
 local TabLayout = Instance.new("UIListLayout")
 TabLayout.FillDirection = Enum.FillDirection.Horizontal
 TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
