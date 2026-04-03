@@ -20,7 +20,7 @@ local CONFIG = {
     HoldTime = 0.3,
     -- Altura total = topbar (46) + corpo (334) = 380
     TopbarH  = 46,
-    BodyH    = 390,
+    BodyH    = 300,
     GuiW     = 460,
     AnimSpeed = 0.25,
 }
@@ -286,14 +286,22 @@ local tabButtons  = {}
 local tabContents = {}
 local activeTab   = nil
 
-local TabBar = Instance.new("Frame")
+-- TabBar com scroll horizontal para as abas
+local TabBar = Instance.new("ScrollingFrame")
 TabBar.Name = "TabBar"
 TabBar.Size = UDim2.new(1, 0, 0, 40)
 TabBar.Position = UDim2.new(0, 0, 0, 28)
 TabBar.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 TabBar.BorderSizePixel = 0
 TabBar.ZIndex = 50
+TabBar.ScrollingDirection = Enum.ScrollingDirection.X
+TabBar.ScrollBarThickness = 2
+TabBar.ScrollBarImageColor3 = currentAccent
+TabBar.CanvasSize = UDim2.new(0, 0, 0, 0)
+TabBar.AutomaticCanvasSize = Enum.AutomaticSize.X
+TabBar.VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar
 TabBar.Parent = BodyFrame
+registerAccent(TabBar, "ScrollBarImageColor3")
 
 -- Frame bloqueador: cobre toda a area acima do conteúdo (topbar overlap + tabbar)
 -- Impede que elementos scrollados apareçam sobre as abas
