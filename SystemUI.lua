@@ -34,10 +34,34 @@ do
     if ok and type(result) == "table" then Icons = result end
 end
 
+-- Fallback table for common Lucide naming variations
+local _iconAliases = {
+    ["refresh-cw"]      = {"rotate-cw", "refresh"},
+    ["trash-2"]         = {"trash", "delete"},
+    ["triangle-alert"]  = {"alert-triangle", "warning"},
+    ["check-circle"]    = {"circle-check", "check"},
+    ["x-circle"]        = {"circle-x", "x"},
+    ["tree-pine"]       = {"tree", "leaf"},
+    ["mountain-snow"]   = {"mountain", "triangle"},
+    ["atom"]            = {"circle-dot", "disc"},
+    ["waves"]           = {"water", "activity"},
+    ["trending-up"]     = {"arrow-up-right", "chevrons-up"},
+    ["circle-dot"]      = {"dot-circle", "target"},
+    ["trophy"]          = {"award", "star"},
+}
+
 local function ResolveIcon(str)
     if not str then return nil end
     local key = str:gsub("^lucide%-", "")
-    return Icons[key]
+    if Icons[key] then return Icons[key] end
+    -- try aliases
+    local alts = _iconAliases[key]
+    if alts then
+        for _, alt in ipairs(alts) do
+            if Icons[alt] then return Icons[alt] end
+        end
+    end
+    return nil
 end
 
 -- =========================================================================
@@ -380,6 +404,7 @@ local function MakeResizable(frame, minW, minH)
                                    0, math.max(minH, sSize.Y + d.Y))
         end
     end)
+    return grip  -- expose for show/hide
 end
 
 -- =========================================================================
@@ -420,21 +445,14 @@ local function SendNotif(cfg, T)
     F.BackgroundTransparency = 0.08
     F.ClipsDescendants = true
     F.Parent = _notifContainer
-    Corner(F, 8); Stroke(F, aC, 1, 0.2)
+    Corner(F, 8); Stroke(F, aC, 1.5, 0.15)
 
-    -- 2px accent bar
-    local bar = Instance.new("Frame")
-    bar.Size = UDim2.new(0, 2, 1, 0)
-    bar.BackgroundColor3 = aC
-    bar.BorderSizePixel = 0
-    bar.Parent = F; Corner(bar, 1)
-
-    -- icon
-    local ic = Icon(F, typeI[nType] or "bell", 16, 12, 0, aC)
+    -- icon (no side bar, flush left)
+    local ic = Icon(F, typeI[nType] or "bell", 18, 10, 0, aC)
 
     local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, -46, 0, 20)
-    title.Position = UDim2.new(0, 36, 0, 8)
+    title.Size = UDim2.new(1, -42, 0, 22)
+    title.Position = UDim2.new(0, 36, 0, 7)
     title.BackgroundTransparency = 1
     title.Text = cfg.Title or "Notification"
     title.TextColor3 = aC
@@ -444,8 +462,8 @@ local function SendNotif(cfg, T)
     title.Parent = F
 
     local desc = Instance.new("TextLabel")
-    desc.Size = UDim2.new(1, -46, 0, 26)
-    desc.Position = UDim2.new(0, 36, 0, 28)
+    desc.Size = UDim2.new(1, -42, 0, 24)
+    desc.Position = UDim2.new(0, 36, 0, 29)
     desc.BackgroundTransparency = 1
     desc.Text = cfg.Desc or cfg.Description or ""
     desc.TextColor3 = T.DimText
@@ -486,17 +504,21 @@ local SystemUI = {}
 
 function SystemUI:CreateWindow(config)
     config = config or {}
-    local wTitle   = config.Title     or "SYSTEM INTERFACE"
-    local wSub     = config.SubTitle  or "SystemUI v2.0"
-    local wBlur    = config.Blur      ~= false
-    local wSize    = config.Size      or UDim2.new(0, 580, 0, 440)
-    local wKey     = config.ToggleKey or Enum.KeyCode.RightShift
-    local wTheme   = config.Theme     or "Holographic"
-    local T        = Themes[wTheme]   or Themes.Holographic
-    local cfgName  = wTitle:gsub("%s+", "_")
-    local savedCfg = LoadConfig(cfgName)
-    local cfgData  = {}
-    local conns    = {}
+    local wTitle      = config.Title       or "SYSTEM INTERFACE"
+    local wSub        = config.SubTitle    or "SystemUI v2.0"
+    local wBlur       = config.Blur        ~= false
+    local wSize       = config.Size        or UDim2.new(0, 580, 0, 440)
+    local wKey        = config.ToggleKey   or Enum.KeyCode.RightShift
+    local wTheme      = config.Theme       or "Holographic"
+    local T           = Themes[wTheme]     or Themes.Holographic
+    -- Bubble (shrink-to-dot) config
+    local bImage      = config.BubbleImage  -- rbxassetid (optional)
+    local bText       = config.BubbleText   or "S.M"
+    local bSize       = config.BubbleSize   or 52
+    local cfgName     = wTitle:gsub("%s+", "_")
+    local savedCfg    = LoadConfig(cfgName)
+    local cfgData     = {}
+    local conns       = {}
 
     -- Color registry for live theme switching
     local colorRefs = {}
@@ -631,9 +653,9 @@ function SystemUI:CreateWindow(config)
         return b
     end
 
-    local BMin   = WinBtn("−", T.Warning)
-    local BRestore = WinBtn("□", T.Info)
-    local BClose = WinBtn("✕", T.Error)
+    local BMin    = WinBtn("−", T.Warning)
+    local BShrink = WinBtn("◎", T.Info)   -- shrink-to-bubble button
+    local BClose  = WinBtn("✕", T.Error)
 
     -- -----------------------------------------------------------------------
     --  BODY
@@ -675,35 +697,143 @@ function SystemUI:CreateWindow(config)
 
     -- Draggable & resizable
     MakeDraggable(Main, Header)
-    MakeResizable(Main, 400, 280)
+    local ResizeGrip = MakeResizable(Main, 400, 280)
 
-    -- Window button logic
-    local minimized = false
+    -- -----------------------------------------------------------------------
+    --  BUBBLE  (shrink-to-dot) — parented to ScreenGui, always on top
+    -- -----------------------------------------------------------------------
+    local Bubble = Instance.new("Frame")
+    Bubble.Name = "Bubble"
+    Bubble.Size = UDim2.new(0, bSize, 0, bSize)
+    Bubble.Position = UDim2.new(0, 18, 0, 18)
+    Bubble.BackgroundColor3 = T.Background
+    Bubble.BackgroundTransparency = 0.04
+    Bubble.Visible = false
+    Bubble.ZIndex = 50
+    Bubble.ClipsDescendants = true
+    Bubble.Parent = Gui
+    Corner(Bubble, bSize / 2)
+    local bubbleStroke = Stroke(Bubble, T.Accent, 2, 0)
+    RC(Bubble, "BackgroundColor3", "Background")
+    RC(bubbleStroke, "Color", "Accent")
+
+    -- Outer glow ring (decorative)
+    local bubbleGlow = Instance.new("Frame")
+    bubbleGlow.Size = UDim2.new(1, 10, 1, 10)
+    bubbleGlow.Position = UDim2.new(0, -5, 0, -5)
+    bubbleGlow.BackgroundColor3 = T.Accent
+    bubbleGlow.BackgroundTransparency = 0.82
+    bubbleGlow.ZIndex = 49
+    bubbleGlow.Parent = Bubble
+    Corner(bubbleGlow, (bSize + 10) / 2)
+    RC(bubbleGlow, "BackgroundColor3", "Accent")
+
+    -- Bubble content: image OR text
+    if bImage then
+        local bImg = Instance.new("ImageLabel")
+        bImg.Size = UDim2.new(1, -8, 1, -8)
+        bImg.Position = UDim2.new(0, 4, 0, 4)
+        bImg.BackgroundTransparency = 1
+        bImg.Image = bImage
+        bImg.ScaleType = Enum.ScaleType.Fit
+        bImg.ZIndex = 52
+        bImg.Parent = Bubble
+        Corner(bImg, (bSize - 8) / 2)
+    else
+        local bLbl = Instance.new("TextLabel")
+        bLbl.Size = UDim2.new(1, 0, 1, 0)
+        bLbl.BackgroundTransparency = 1
+        bLbl.Text = bText
+        bLbl.TextColor3 = T.Accent
+        bLbl.Font = Enum.Font.GothamBold
+        bLbl.TextSize = math.clamp(bSize / 3.5, 11, 16)
+        bLbl.ZIndex = 52
+        bLbl.Parent = Bubble
+        RC(bLbl, "TextColor3", "Accent")
+    end
+
+    -- Bubble click zone + drag
+    local bubbleBtn = Instance.new("TextButton")
+    bubbleBtn.Size = UDim2.new(1, 0, 1, 0)
+    bubbleBtn.BackgroundTransparency = 1
+    bubbleBtn.Text = ""
+    bubbleBtn.ZIndex = 53
+    bubbleBtn.Parent = Bubble
+    MakeDraggable(Bubble, bubbleBtn)
+
+    -- Pulsing glow animation
+    local function PulseGlow()
+        if not Bubble.Visible then return end
+        CT(bubbleGlow, {BackgroundTransparency = 0.95}, 0.9, Enum.EasingStyle.Sine).Completed:Connect(function()
+            if not Bubble.Visible then return end
+            CT(bubbleGlow, {BackgroundTransparency = 0.7}, 0.9, Enum.EasingStyle.Sine).Completed:Connect(function()
+                PulseGlow()
+            end)
+        end)
+    end
+
+    -- Bubble click → restore window
+    local inBubbleMode = false
+    bubbleBtn.MouseButton1Click:Connect(function()
+        inBubbleMode = false
+        CT(Bubble, {Size = UDim2.new(0, 0, 0, 0)}, 0.25, Enum.EasingStyle.Quart)
+        task.wait(0.28)
+        Bubble.Visible = false
+        Main.Visible = true
+        ResizeGrip.Visible = true
+        CT(Main, {Size = storedSize}, 0.38, Enum.EasingStyle.Back)
+        visible = true
+    end)
+
+    -- -----------------------------------------------------------------------
+    --  WINDOW BUTTON LOGIC
+    -- -----------------------------------------------------------------------
+    local minimized  = false
     local storedSize = wSize
-    local visible = true
+    local visible    = true
 
+    -- [−] Minimize → compact pill (not full width)
     BMin.MouseButton1Click:Connect(function()
         minimized = not minimized
         if minimized then
             storedSize = Main.Size
-            CT(Main, {Size = UDim2.new(0, storedSize.X.Offset, 0, 52)}, 0.28, Enum.EasingStyle.Quart)
-            task.wait(0.15); Body.Visible = false
+            Body.Visible = false
+            ResizeGrip.Visible = false
+            -- Animate to slim pill shape
+            CT(Main, {Size = UDim2.new(0, 248, 0, 46)}, 0.3, Enum.EasingStyle.Back)
         else
+            ResizeGrip.Visible = true
             Body.Visible = true
-            CT(Main, {Size = storedSize}, 0.3, Enum.EasingStyle.Back)
+            CT(Main, {Size = storedSize}, 0.32, Enum.EasingStyle.Back)
         end
     end)
-    BRestore.MouseButton1Click:Connect(function()
-        if minimized then
-            minimized = false; Body.Visible = true
-            CT(Main, {Size = storedSize}, 0.3, Enum.EasingStyle.Back)
-        else
-            Main.Position = UDim2.new(0.5, -Main.AbsoluteSize.X/2, 0.5, -Main.AbsoluteSize.Y/2)
-        end
+
+    -- [◎] Shrink to bubble
+    BShrink.MouseButton1Click:Connect(function()
+        if inBubbleMode then return end
+        inBubbleMode = true
+        storedSize = minimized and storedSize or Main.Size
+        -- Animate window out
+        CT(Main, {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 0.9}, 0.28, Enum.EasingStyle.Quart)
+        task.wait(0.3)
+        Main.Visible = false
+        Body.Visible = true   -- reset for restore
+        ResizeGrip.Visible = false
+        minimized = false
+        -- Show bubble
+        Bubble.Size = UDim2.new(0, 0, 0, 0)
+        Bubble.Visible = true
+        CT(Bubble, {Size = UDim2.new(0, bSize, 0, bSize)}, 0.42, Enum.EasingStyle.Back)
+        task.wait(0.15)
+        PulseGlow()
+        visible = false
     end)
+
+    -- [✕] Close
     BClose.MouseButton1Click:Connect(function()
         CT(Main, {Size = UDim2.new(0,0,0,0), BackgroundTransparency = 1}, 0.3)
         if BlurFX then CT(BlurFX, {Size = 0}, 0.3) end
+        Bubble.Visible = false
         task.wait(0.35)
         Gui:Destroy()
         if BlurFX and BlurFX.Parent then BlurFX:Destroy() end
@@ -713,10 +843,23 @@ function SystemUI:CreateWindow(config)
     table.insert(conns, UserInputService.InputBegan:Connect(function(i, gpe)
         if gpe then return end
         if i.KeyCode == wKey then
+            if inBubbleMode then
+                -- restore from bubble
+                inBubbleMode = false
+                CT(Bubble, {Size = UDim2.new(0, 0, 0, 0)}, 0.22)
+                task.wait(0.25)
+                Bubble.Visible = false
+                Main.Visible = true
+                ResizeGrip.Visible = true
+                CT(Main, {Size = storedSize}, 0.38, Enum.EasingStyle.Back)
+                visible = true
+                return
+            end
             visible = not visible
             if visible then
                 Main.Visible = true
-                CT(Main, {Size = minimized and UDim2.new(0, storedSize.X.Offset, 0, 52) or storedSize}, 0.32, Enum.EasingStyle.Back)
+                ResizeGrip.Visible = not minimized
+                CT(Main, {Size = minimized and UDim2.new(0, 248, 0, 46) or storedSize}, 0.32, Enum.EasingStyle.Back)
             else
                 CT(Main, {Size = UDim2.new(0,0,0,0)}, 0.25)
                 task.wait(0.3); Main.Visible = false
