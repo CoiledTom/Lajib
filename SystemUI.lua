@@ -473,21 +473,36 @@ local function SendNotif(cfg, T)
     desc.TextXAlignment = Enum.TextXAlignment.Left
     desc.Parent = F
 
-    local pgBg = Instance.new("Frame")
-    pgBg.Size = UDim2.new(1, 0, 0, 2)
-    pgBg.Position = UDim2.new(0, 0, 1, -2)
-    pgBg.BackgroundColor3 = T.ComponentBg
-    pgBg.BorderSizePixel = 0
-    pgBg.Parent = F
-
-    local pg = Instance.new("Frame")
-    pg.Size = UDim2.new(1, 0, 1, 0)
-    pg.BackgroundColor3 = aC
-    pg.BorderSizePixel = 0
-    pg.Parent = pgBg
+    -- Countdown number (replaces progress bar)
+    local timerLbl = Instance.new("TextLabel")
+    timerLbl.Size = UDim2.new(0, 32, 0, 18)
+    timerLbl.Position = UDim2.new(1, -36, 1, -22)
+    timerLbl.BackgroundTransparency = 1
+    timerLbl.Text = string.format("%.1f", dur)
+    timerLbl.TextColor3 = Color3.fromRGB(
+        math.round(aC.R * 255),
+        math.round(aC.G * 255),
+        math.round(aC.B * 255))
+    timerLbl.TextTransparency = 0.3
+    timerLbl.Font = Enum.Font.GothamBold
+    timerLbl.TextSize = 11
+    timerLbl.TextXAlignment = Enum.TextXAlignment.Right
+    timerLbl.ZIndex = 3
+    timerLbl.Parent = F
 
     CT(F, {Size = UDim2.new(1, 0, 0, 68)}, 0.4, Enum.EasingStyle.Back)
-    CT(pg, {Size = UDim2.new(0, 0, 1, 0)}, dur, Enum.EasingStyle.Linear)
+
+    -- Countdown task
+    task.spawn(function()
+        local remaining = dur
+        while remaining > 0 and F.Parent do
+            task.wait(0.1)
+            remaining = math.max(0, remaining - 0.1)
+            if F.Parent then
+                timerLbl.Text = string.format("%.1f", remaining)
+            end
+        end
+    end)
 
     task.delay(dur, function()
         if not F or not F.Parent then return end
@@ -506,15 +521,14 @@ function SystemUI:CreateWindow(config)
     config = config or {}
     local wTitle      = config.Title       or "SYSTEM INTERFACE"
     local wSub        = config.SubTitle    or "SystemUI v2.0"
-    local wBlur       = config.Blur        ~= false
     local wSize       = config.Size        or UDim2.new(0, 580, 0, 440)
     local wKey        = config.ToggleKey   or Enum.KeyCode.RightShift
     local wTheme      = config.Theme       or "Holographic"
     local T           = Themes[wTheme]     or Themes.Holographic
     -- Bubble (shrink-to-dot) config
-    local bImage      = config.BubbleImage  -- rbxassetid (optional)
-    local bText       = config.BubbleText   or "S.M"
-    local bSize       = config.BubbleSize   or 52
+    local bImage      = config.BubbleImage
+    local bText       = config.BubbleText  or "S.M"
+    local bSize       = config.BubbleSize  or 52
     local cfgName     = wTitle:gsub("%s+", "_")
     local savedCfg    = LoadConfig(cfgName)
     local cfgData     = {}
@@ -543,13 +557,7 @@ function SystemUI:CreateWindow(config)
     Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     Gui.Parent = CoreGui
 
-    local BlurFX
-    if wBlur then
-        BlurFX = Instance.new("BlurEffect")
-        BlurFX.Size = 0
-        BlurFX.Parent = Lighting
-        CT(BlurFX, {Size = 10}, 0.5)
-    end
+    -- (Blur removido — não afeta Lighting)
 
     -- -----------------------------------------------------------------------
     --  MAIN FRAME
@@ -560,7 +568,7 @@ function SystemUI:CreateWindow(config)
     Main.Position = UDim2.new(0.5, -wSize.X.Offset/2, 0.5, -wSize.Y.Offset/2)
     Main.BackgroundColor3 = T.Background
     Main.BackgroundTransparency = 0.1
-    Main.ClipsDescendants = true
+    Main.ClipsDescendants = false   -- let UICorner handle visual rounding
     Main.Parent = Gui
     Corner(Main, 10)
     local mainStroke = Stroke(Main, T.Accent, 1.2, 0.3)
@@ -569,15 +577,28 @@ function SystemUI:CreateWindow(config)
     CT(Main, {Size = wSize}, 0.5, Enum.EasingStyle.Exponential)
 
     -- -----------------------------------------------------------------------
-    --  HEADER
+    --  HEADER  (top corners rounded, bottom squared)
     -- -----------------------------------------------------------------------
     local Header = Instance.new("Frame")
     Header.Size = UDim2.new(1, 0, 0, 52)
     Header.BackgroundColor3 = T.HeaderBg
     Header.BackgroundTransparency = 0.05
     Header.BorderSizePixel = 0
+    Header.ClipsDescendants = false
     Header.ZIndex = 3; Header.Parent = Main
+    Corner(Header, 10)           -- rounds all 4 corners of the header
     RC(Header, "BackgroundColor3", "HeaderBg")
+
+    -- Square off the BOTTOM half of the header to hide bottom rounded corners
+    local HdrBot = Instance.new("Frame")
+    HdrBot.Size = UDim2.new(1, 0, 0, 12)
+    HdrBot.Position = UDim2.new(0, 0, 1, -12)
+    HdrBot.BackgroundColor3 = T.HeaderBg
+    HdrBot.BackgroundTransparency = 0.05
+    HdrBot.BorderSizePixel = 0
+    HdrBot.ZIndex = 3
+    HdrBot.Parent = Header
+    RC(HdrBot, "BackgroundColor3", "HeaderBg")
 
     local HLine = Instance.new("Frame")
     HLine.Size = UDim2.new(1, 0, 0, 1)
@@ -700,12 +721,20 @@ function SystemUI:CreateWindow(config)
     local ResizeGrip = MakeResizable(Main, 400, 280)
 
     -- -----------------------------------------------------------------------
-    --  BUBBLE  (shrink-to-dot) — parented to ScreenGui, always on top
+    --  STATE  (declared early so closures below capture correct upvalues)
+    -- -----------------------------------------------------------------------
+    local minimized  = false
+    local storedSize = wSize
+    local visible    = true
+    local inBubbleMode = false
+
+    -- -----------------------------------------------------------------------
+    --  BUBBLE  (shrink-to-dot)
     -- -----------------------------------------------------------------------
     local Bubble = Instance.new("Frame")
     Bubble.Name = "Bubble"
     Bubble.Size = UDim2.new(0, bSize, 0, bSize)
-    Bubble.Position = UDim2.new(0, 18, 0, 18)
+    Bubble.Position = UDim2.new(0, 18, 0, 110)  -- left side, below top UI chrome
     Bubble.BackgroundColor3 = T.Background
     Bubble.BackgroundTransparency = 0.04
     Bubble.Visible = false
@@ -717,7 +746,7 @@ function SystemUI:CreateWindow(config)
     RC(Bubble, "BackgroundColor3", "Background")
     RC(bubbleStroke, "Color", "Accent")
 
-    -- Outer glow ring (decorative)
+    -- Outer glow ring
     local bubbleGlow = Instance.new("Frame")
     bubbleGlow.Size = UDim2.new(1, 10, 1, 10)
     bubbleGlow.Position = UDim2.new(0, -5, 0, -5)
@@ -728,7 +757,7 @@ function SystemUI:CreateWindow(config)
     Corner(bubbleGlow, (bSize + 10) / 2)
     RC(bubbleGlow, "BackgroundColor3", "Accent")
 
-    -- Bubble content: image OR text
+    -- Content: image OR text
     if bImage then
         local bImg = Instance.new("ImageLabel")
         bImg.Size = UDim2.new(1, -8, 1, -8)
@@ -752,56 +781,84 @@ function SystemUI:CreateWindow(config)
         RC(bLbl, "TextColor3", "Accent")
     end
 
-    -- Bubble click zone + drag
+    -- Click zone (drag is on Bubble frame itself for clean separation)
     local bubbleBtn = Instance.new("TextButton")
     bubbleBtn.Size = UDim2.new(1, 0, 1, 0)
     bubbleBtn.BackgroundTransparency = 1
     bubbleBtn.Text = ""
     bubbleBtn.ZIndex = 53
     bubbleBtn.Parent = Bubble
-    MakeDraggable(Bubble, bubbleBtn)
+    MakeDraggable(Bubble, Bubble)   -- drag from the frame itself
 
-    -- Pulsing glow animation
+    -- Pulsing glow
     local function PulseGlow()
         if not Bubble.Visible then return end
-        CT(bubbleGlow, {BackgroundTransparency = 0.95}, 0.9, Enum.EasingStyle.Sine).Completed:Connect(function()
+        CT(bubbleGlow, {BackgroundTransparency = 0.94}, 0.9, Enum.EasingStyle.Sine).Completed:Connect(function()
             if not Bubble.Visible then return end
-            CT(bubbleGlow, {BackgroundTransparency = 0.7}, 0.9, Enum.EasingStyle.Sine).Completed:Connect(function()
+            CT(bubbleGlow, {BackgroundTransparency = 0.68}, 0.9, Enum.EasingStyle.Sine).Completed:Connect(function()
                 PulseGlow()
             end)
         end)
     end
 
-    -- Bubble click → restore window
-    local inBubbleMode = false
-    bubbleBtn.MouseButton1Click:Connect(function()
+    -- Helper: restore from bubble/shrunk state
+    local function RestoreWindow()
         inBubbleMode = false
-        CT(Bubble, {Size = UDim2.new(0, 0, 0, 0)}, 0.25, Enum.EasingStyle.Quart)
-        task.wait(0.28)
+        CT(Bubble, {Size = UDim2.new(0, 0, 0, 0)}, 0.22, Enum.EasingStyle.Quart)
+        task.wait(0.25)
         Bubble.Visible = false
+        Main.BackgroundTransparency = 0.1
         Main.Visible = true
+        SubLbl.Visible = true
+        AuthLbl.Visible = true
         ResizeGrip.Visible = true
         CT(Main, {Size = storedSize}, 0.38, Enum.EasingStyle.Back)
         visible = true
+    end
+
+    -- Bubble tap → restore (use InputBegan for reliable mobile touch)
+    bubbleBtn.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1
+        or i.UserInputType == Enum.UserInputType.Touch then
+            local startPos = i.Position
+            local moved = false
+            local moveConn = UserInputService.InputChanged:Connect(function(mi)
+                if (mi.UserInputType == Enum.UserInputType.MouseMovement
+                or mi.UserInputType == Enum.UserInputType.Touch) then
+                    if (mi.Position - startPos).Magnitude > 8 then
+                        moved = true
+                    end
+                end
+            end)
+            i.Changed:Connect(function()
+                if i.UserInputState == Enum.UserInputState.End then
+                    moveConn:Disconnect()
+                    if not moved then
+                        task.spawn(RestoreWindow)
+                    end
+                end
+            end)
+        end
     end)
 
     -- -----------------------------------------------------------------------
     --  WINDOW BUTTON LOGIC
     -- -----------------------------------------------------------------------
-    local minimized  = false
-    local storedSize = wSize
-    local visible    = true
 
-    -- [−] Minimize → compact pill (not full width)
+    -- [−] Minimize → compact pill
     BMin.MouseButton1Click:Connect(function()
         minimized = not minimized
         if minimized then
             storedSize = Main.Size
+            -- Hide labels that don't fit in the pill
+            SubLbl.Visible = false
+            AuthLbl.Visible = false
             Body.Visible = false
             ResizeGrip.Visible = false
-            -- Animate to slim pill shape
-            CT(Main, {Size = UDim2.new(0, 248, 0, 46)}, 0.3, Enum.EasingStyle.Back)
+            CT(Main, {Size = UDim2.new(0, 260, 0, 44)}, 0.3, Enum.EasingStyle.Back)
         else
+            SubLbl.Visible = true
+            AuthLbl.Visible = true
             ResizeGrip.Visible = true
             Body.Visible = true
             CT(Main, {Size = storedSize}, 0.32, Enum.EasingStyle.Back)
@@ -813,30 +870,30 @@ function SystemUI:CreateWindow(config)
         if inBubbleMode then return end
         inBubbleMode = true
         storedSize = minimized and storedSize or Main.Size
-        -- Animate window out
-        CT(Main, {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 0.9}, 0.28, Enum.EasingStyle.Quart)
-        task.wait(0.3)
+        CT(Main, {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 0.9}, 0.25, Enum.EasingStyle.Quart)
+        task.wait(0.28)
         Main.Visible = false
-        Body.Visible = true   -- reset for restore
+        -- Reset state for restore
+        Body.Visible = true
+        SubLbl.Visible = true
+        AuthLbl.Visible = true
         ResizeGrip.Visible = false
         minimized = false
-        -- Show bubble
+        -- Animate bubble in
         Bubble.Size = UDim2.new(0, 0, 0, 0)
         Bubble.Visible = true
         CT(Bubble, {Size = UDim2.new(0, bSize, 0, bSize)}, 0.42, Enum.EasingStyle.Back)
-        task.wait(0.15)
+        task.wait(0.2)
         PulseGlow()
         visible = false
     end)
 
     -- [✕] Close
     BClose.MouseButton1Click:Connect(function()
-        CT(Main, {Size = UDim2.new(0,0,0,0), BackgroundTransparency = 1}, 0.3)
-        if BlurFX then CT(BlurFX, {Size = 0}, 0.3) end
+        CT(Main, {Size = UDim2.new(0,0,0,0), BackgroundTransparency = 1}, 0.28)
         Bubble.Visible = false
-        task.wait(0.35)
+        task.wait(0.32)
         Gui:Destroy()
-        if BlurFX and BlurFX.Parent then BlurFX:Destroy() end
         for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
     end)
 
@@ -844,22 +901,16 @@ function SystemUI:CreateWindow(config)
         if gpe then return end
         if i.KeyCode == wKey then
             if inBubbleMode then
-                -- restore from bubble
-                inBubbleMode = false
-                CT(Bubble, {Size = UDim2.new(0, 0, 0, 0)}, 0.22)
-                task.wait(0.25)
-                Bubble.Visible = false
-                Main.Visible = true
-                ResizeGrip.Visible = true
-                CT(Main, {Size = storedSize}, 0.38, Enum.EasingStyle.Back)
-                visible = true
+                task.spawn(RestoreWindow)
                 return
             end
             visible = not visible
             if visible then
                 Main.Visible = true
+                SubLbl.Visible = not minimized
+                AuthLbl.Visible = not minimized
                 ResizeGrip.Visible = not minimized
-                CT(Main, {Size = minimized and UDim2.new(0, 248, 0, 46) or storedSize}, 0.32, Enum.EasingStyle.Back)
+                CT(Main, {Size = minimized and UDim2.new(0, 260, 0, 44) or storedSize}, 0.32, Enum.EasingStyle.Back)
             else
                 CT(Main, {Size = UDim2.new(0,0,0,0)}, 0.25)
                 task.wait(0.3); Main.Visible = false
@@ -887,7 +938,6 @@ function SystemUI:CreateWindow(config)
     function Win:LoadConfig() return LoadConfig(cfgName) end
     function Win:Destroy()
         for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
-        if BlurFX and BlurFX.Parent then BlurFX:Destroy() end
         if Gui and Gui.Parent then Gui:Destroy() end
     end
 
@@ -2137,18 +2187,26 @@ function SystemUI:CreateWindow(config)
 
                 -- Refresh button
                 local refRow = Instance.new("Frame")
-                refRow.Size = UDim2.new(1, 0, 0, 26)
-                refRow.BackgroundTransparency = 1
+                refRow.Size = UDim2.new(1, 0, 0, 30)
+                refRow.BackgroundColor3 = T.ComponentBg
+                refRow.BackgroundTransparency = 0.38
+                refRow.BorderSizePixel = 0
                 refRow.LayoutOrder = NextOrd()
                 refRow.Parent = SecContent
+                Corner(refRow, 5)
+                RC(refRow, "BackgroundColor3", "ComponentBg")
+
+                local refIc = Icon(refRow, "rotate-cw", 13, 10, 0, T.Accent)
+                if refIc then RC(refIc, "ImageColor3", "Accent") end
 
                 local refBtn = Instance.new("TextButton")
                 refBtn.Size = UDim2.new(1, 0, 1, 0)
                 refBtn.BackgroundTransparency = 1
-                refBtn.Text = "↻  Refresh"
+                refBtn.Text = "  Refresh"
                 refBtn.TextColor3 = T.Accent
                 refBtn.Font = Enum.Font.GothamBold
                 refBtn.TextSize = 12
+                refBtn.TextXAlignment = Enum.TextXAlignment.Left
                 refBtn.Parent = refRow
                 RC(refBtn, "TextColor3", "Accent")
                 refBtn.MouseButton1Click:Connect(Build)
