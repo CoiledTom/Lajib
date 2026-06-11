@@ -21,44 +21,56 @@ local Lighting         = game:GetService("Lighting")
 local Player           = Players.LocalPlayer
 
 -- =========================================================================
---  ICONS  — loaded synchronously from repo
+--  ICONS  — Icons2.lua (raw numeric IDs, no dashes in keys)
 -- =========================================================================
 local Icons = {}
 do
     local ok, result = pcall(function()
         return loadstring(game:HttpGet(
-            "https://raw.githubusercontent.com/CoiledTom/Lajib/refs/heads/main/Icons.lua",
+            "https://raw.githubusercontent.com/CoiledTom/Lajib/refs/heads/main/Icons2.lua",
             true
         ))()
     end)
-    if ok and type(result) == "table" then Icons = result end
+    if ok and type(result) == "table" then
+        for k, v in pairs(result) do
+            if type(v) == "number" then
+                Icons[k] = "rbxassetid://" .. tostring(v)
+            elseif type(v) == "string" then
+                Icons[k] = v
+            end
+        end
+    end
 end
 
--- Fallback table for common Lucide naming variations
+-- Normalise: strip "lucide-" prefix + all dashes + lowercase
+local function _norm(s) return (s or ""):gsub("^lucide%-",""):gsub("%-",""):lower() end
+
+-- Fallback aliases (normalised → normalised)
 local _iconAliases = {
-    ["refresh-cw"]      = {"rotate-cw", "refresh"},
-    ["trash-2"]         = {"trash", "delete"},
-    ["triangle-alert"]  = {"alert-triangle", "warning"},
-    ["check-circle"]    = {"circle-check", "check"},
-    ["x-circle"]        = {"circle-x", "x"},
-    ["tree-pine"]       = {"tree", "leaf"},
-    ["mountain-snow"]   = {"mountain", "triangle"},
-    ["atom"]            = {"circle-dot", "disc"},
-    ["waves"]           = {"water", "activity"},
-    ["trending-up"]     = {"arrow-up-right", "chevrons-up"},
-    ["circle-dot"]      = {"dot-circle", "target"},
-    ["trophy"]          = {"award", "star"},
+    refreshcw      = {"rotatecw","refresh"},
+    trash2         = {"trash","delete"},
+    trianglealert  = {"alerttriangle","warning"},
+    checkcircle    = {"checkcircle2","check"},
+    xcircle        = {"x","closecircle"},
+    treepine       = {"tree","leaf"},
+    mountainsnow   = {"mountain"},
+    waves          = {"water","activity"},
+    trendingup     = {"arrowupright"},
+    circledot      = {"target"},
+    trophy         = {"award","star"},
+    rotatecw       = {"refreshcw","refresh"},
+    lockkeyhole    = {"lock","keyhole"},
+    lockopen       = {"unlock","lockkeyholeopen"},
 }
 
 local function ResolveIcon(str)
     if not str then return nil end
-    local key = str:gsub("^lucide%-", "")
+    local key = _norm(str)
     if Icons[key] then return Icons[key] end
-    -- try aliases
     local alts = _iconAliases[key]
     if alts then
         for _, alt in ipairs(alts) do
-            if Icons[alt] then return Icons[alt] end
+            if Icons[_norm(alt)] then return Icons[_norm(alt)] end
         end
     end
     return nil
@@ -251,6 +263,75 @@ local Themes = {
         TabHover     = Color3.fromRGB(40, 30, 4),
         SeparatorClr = Color3.fromRGB(210, 155, 30),
         NotifBg      = Color3.fromRGB(14, 11, 4),
+    },
+
+    Black = {
+        Background   = Color3.fromRGB(5, 5, 6),
+        HeaderBg     = Color3.fromRGB(3, 3, 4),
+        SectionBg    = Color3.fromRGB(8, 8, 10),
+        SecondaryBg  = Color3.fromRGB(12, 12, 14),
+        ComponentBg  = Color3.fromRGB(16, 16, 20),
+        Accent       = Color3.fromRGB(220, 220, 240),
+        AccentDim    = Color3.fromRGB(140, 140, 160),
+        Text         = Color3.fromRGB(230, 230, 240),
+        DimText      = Color3.fromRGB(110, 110, 130),
+        Success      = Color3.fromRGB(0, 210, 130),
+        Error        = Color3.fromRGB(230, 60, 60),
+        Warning      = Color3.fromRGB(220, 180, 0),
+        Info         = Color3.fromRGB(180, 180, 255),
+        ToggleOn     = Color3.fromRGB(40, 40, 55),
+        ToggleOff    = Color3.fromRGB(20, 20, 26),
+        SliderFill   = Color3.fromRGB(200, 200, 220),
+        TabActive    = Color3.fromRGB(30, 30, 40),
+        TabHover     = Color3.fromRGB(20, 20, 28),
+        SeparatorClr = Color3.fromRGB(80, 80, 100),
+        NotifBg      = Color3.fromRGB(5, 5, 6),
+    },
+
+    White = {
+        Background   = Color3.fromRGB(240, 242, 248),
+        HeaderBg     = Color3.fromRGB(228, 232, 244),
+        SectionBg    = Color3.fromRGB(230, 234, 246),
+        SecondaryBg  = Color3.fromRGB(220, 226, 240),
+        ComponentBg  = Color3.fromRGB(210, 216, 232),
+        Accent       = Color3.fromRGB(60, 90, 200),
+        AccentDim    = Color3.fromRGB(40, 65, 160),
+        Text         = Color3.fromRGB(30, 35, 55),
+        DimText      = Color3.fromRGB(100, 110, 150),
+        Success      = Color3.fromRGB(0, 160, 90),
+        Error        = Color3.fromRGB(200, 40, 50),
+        Warning      = Color3.fromRGB(180, 130, 0),
+        Info         = Color3.fromRGB(60, 90, 200),
+        ToggleOn     = Color3.fromRGB(180, 200, 240),
+        ToggleOff    = Color3.fromRGB(190, 196, 215),
+        SliderFill   = Color3.fromRGB(60, 90, 200),
+        TabActive    = Color3.fromRGB(190, 202, 238),
+        TabHover     = Color3.fromRGB(200, 210, 240),
+        SeparatorClr = Color3.fromRGB(100, 120, 180),
+        NotifBg      = Color3.fromRGB(240, 242, 248),
+    },
+
+    Brown = {
+        Background   = Color3.fromRGB(20, 13, 8),
+        HeaderBg     = Color3.fromRGB(14, 9, 5),
+        SectionBg    = Color3.fromRGB(26, 16, 10),
+        SecondaryBg  = Color3.fromRGB(34, 21, 13),
+        ComponentBg  = Color3.fromRGB(44, 27, 16),
+        Accent       = Color3.fromRGB(200, 140, 70),
+        AccentDim    = Color3.fromRGB(145, 95, 45),
+        Text         = Color3.fromRGB(255, 240, 220),
+        DimText      = Color3.fromRGB(160, 125, 90),
+        Success      = Color3.fromRGB(0, 220, 140),
+        Error        = Color3.fromRGB(220, 70, 60),
+        Warning      = Color3.fromRGB(230, 175, 40),
+        Info         = Color3.fromRGB(200, 140, 70),
+        ToggleOn     = Color3.fromRGB(70, 42, 22),
+        ToggleOff    = Color3.fromRGB(44, 27, 16),
+        SliderFill   = Color3.fromRGB(200, 140, 70),
+        TabActive    = Color3.fromRGB(60, 36, 18),
+        TabHover     = Color3.fromRGB(44, 27, 14),
+        SeparatorClr = Color3.fromRGB(160, 100, 50),
+        NotifBg      = Color3.fromRGB(20, 13, 8),
     },
 }
 
@@ -674,9 +755,30 @@ function SystemUI:CreateWindow(config)
         return b
     end
 
+    -- Icon-based button (for close)
+    local function WinIconBtn(iconKey, clr)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(0, 24, 0, 22)
+        b.BackgroundColor3 = T.ComponentBg
+        b.BackgroundTransparency = 0.35
+        b.Text = ""
+        b.ZIndex = 6; b.Parent = BtnRow
+        Corner(b, 4); Stroke(b, clr, 1, 0.55)
+        local ic = Icon(b, iconKey, 12, 6, 0, clr)
+        b.MouseEnter:Connect(function()
+            CT(b, {BackgroundTransparency = 0}, 0.12)
+            if ic then CT(ic, {ImageColor3 = Color3.fromRGB(255,255,255)}, 0.12) end
+        end)
+        b.MouseLeave:Connect(function()
+            CT(b, {BackgroundTransparency = 0.35}, 0.12)
+            if ic then CT(ic, {ImageColor3 = clr}, 0.12) end
+        end)
+        return b
+    end
+
     local BMin    = WinBtn("−", T.Warning)
-    local BShrink = WinBtn("◎", T.Info)   -- shrink-to-bubble button
-    local BClose  = WinBtn("✕", T.Error)
+    local BShrink = WinBtn("◎", T.Info)
+    local BClose  = WinIconBtn("x", T.Error)  -- X icon from Icons2
 
     -- -----------------------------------------------------------------------
     --  BODY
@@ -850,18 +952,22 @@ function SystemUI:CreateWindow(config)
         minimized = not minimized
         if minimized then
             storedSize = Main.Size
-            -- Hide labels that don't fit in the pill
             SubLbl.Visible = false
             AuthLbl.Visible = false
+            HdrBot.Visible = false    -- hide bottom-square so pill corners all round
             Body.Visible = false
             ResizeGrip.Visible = false
-            CT(Main, {Size = UDim2.new(0, 260, 0, 44)}, 0.3, Enum.EasingStyle.Back)
+            -- Shrink header to pill height so no overflow
+            CT(Header, {Size = UDim2.new(1, 0, 0, 44)}, 0.3, Enum.EasingStyle.Back)
+            CT(Main,   {Size = UDim2.new(0, 260, 0, 44)}, 0.3, Enum.EasingStyle.Back)
         else
+            HdrBot.Visible = true
             SubLbl.Visible = true
             AuthLbl.Visible = true
             ResizeGrip.Visible = true
             Body.Visible = true
-            CT(Main, {Size = storedSize}, 0.32, Enum.EasingStyle.Back)
+            CT(Header, {Size = UDim2.new(1, 0, 0, 52)}, 0.32, Enum.EasingStyle.Back)
+            CT(Main,   {Size = storedSize}, 0.32, Enum.EasingStyle.Back)
         end
     end)
 
@@ -936,6 +1042,120 @@ function SystemUI:CreateWindow(config)
     function Win:Notify(c)    SendNotif(c, T) end
     function Win:SaveConfig() SaveConfig(cfgName, cfgData) end
     function Win:LoadConfig() return LoadConfig(cfgName) end
+
+    -- Confirm notification with Y / N buttons
+    function Win:Confirm(cfg)
+        cfg = cfg or {}
+        EnsureNotifGui()
+        local dur    = cfg.Duration or 12
+        local onYes  = cfg.OnYes   or function() end
+        local onNo   = cfg.OnNo    or function() end
+
+        local F = Instance.new("Frame")
+        F.Size = UDim2.new(1, 30, 0, 96)
+        F.BackgroundColor3 = T.NotifBg
+        F.BackgroundTransparency = 0.06
+        F.ClipsDescendants = true
+        F.Parent = _notifContainer
+        Corner(F, 8); Stroke(F, T.Warning, 1.5, 0.2)
+
+        -- icon (alert)
+        Icon(F, "alerttriangle", 18, 10, -14, T.Warning)
+
+        local titleLbl = Instance.new("TextLabel")
+        titleLbl.Size = UDim2.new(1, -42, 0, 20)
+        titleLbl.Position = UDim2.new(0, 36, 0, 7)
+        titleLbl.BackgroundTransparency = 1
+        titleLbl.Text = cfg.Title or "Tem certeza?"
+        titleLbl.TextColor3 = T.Warning
+        titleLbl.Font = Enum.Font.GothamBold
+        titleLbl.TextSize = 13
+        titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+        titleLbl.Parent = F
+
+        local descLbl = Instance.new("TextLabel")
+        descLbl.Size = UDim2.new(1, -42, 0, 22)
+        descLbl.Position = UDim2.new(0, 36, 0, 27)
+        descLbl.BackgroundTransparency = 1
+        descLbl.Text = cfg.Desc or ""
+        descLbl.TextColor3 = T.DimText
+        descLbl.Font = Enum.Font.Gotham
+        descLbl.TextSize = 11
+        descLbl.TextWrapped = true
+        descLbl.TextXAlignment = Enum.TextXAlignment.Left
+        descLbl.Parent = F
+
+        local timerLbl = Instance.new("TextLabel")
+        timerLbl.Size = UDim2.new(0, 32, 0, 16)
+        timerLbl.Position = UDim2.new(1, -36, 0, 7)
+        timerLbl.BackgroundTransparency = 1
+        timerLbl.Text = string.format("%.0f", dur)
+        timerLbl.TextColor3 = T.DimText
+        timerLbl.Font = Enum.Font.GothamBold
+        timerLbl.TextSize = 11
+        timerLbl.TextXAlignment = Enum.TextXAlignment.Right
+        timerLbl.Parent = F
+
+        -- Y button
+        local yBtn = Instance.new("TextButton")
+        yBtn.Size = UDim2.new(0.48, -2, 0, 26)
+        yBtn.Position = UDim2.new(0, 6, 1, -32)
+        yBtn.BackgroundColor3 = T.Success
+        yBtn.BackgroundTransparency = 0.2
+        yBtn.Text = "✓  Sim"
+        yBtn.TextColor3 = Color3.fromRGB(255,255,255)
+        yBtn.Font = Enum.Font.GothamBold
+        yBtn.TextSize = 12
+        yBtn.ZIndex = 2
+        Corner(yBtn, 5)
+        yBtn.Parent = F
+
+        -- N button
+        local nBtn = Instance.new("TextButton")
+        nBtn.Size = UDim2.new(0.48, -2, 0, 26)
+        nBtn.Position = UDim2.new(0.5, 2, 1, -32)
+        nBtn.BackgroundColor3 = T.Error
+        nBtn.BackgroundTransparency = 0.2
+        nBtn.Text = "✕  Não"
+        nBtn.TextColor3 = Color3.fromRGB(255,255,255)
+        nBtn.Font = Enum.Font.GothamBold
+        nBtn.TextSize = 12
+        nBtn.ZIndex = 2
+        Corner(nBtn, 5)
+        nBtn.Parent = F
+
+        CT(F, {Size = UDim2.new(1, 0, 0, 96)}, 0.4, Enum.EasingStyle.Back)
+
+        local dismissed = false
+        local function Dismiss()
+            if dismissed then return end
+            dismissed = true
+            CT(F, {BackgroundTransparency = 1, Size = UDim2.new(1, 30, 0, 96)}, 0.3)
+            task.wait(0.35)
+            if F and F.Parent then F:Destroy() end
+        end
+
+        yBtn.MouseButton1Click:Connect(function()
+            task.spawn(onYes); Dismiss()
+        end)
+        nBtn.MouseButton1Click:Connect(function()
+            task.spawn(onNo); Dismiss()
+        end)
+
+        -- countdown
+        task.spawn(function()
+            local rem = dur
+            while rem > 0 and not dismissed and F.Parent do
+                task.wait(1)
+                rem = rem - 1
+                if F.Parent then
+                    timerLbl.Text = string.format("%.0f", rem)
+                end
+            end
+            if not dismissed then Dismiss() end
+        end)
+    end
+
     function Win:Destroy()
         for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
         if Gui and Gui.Parent then Gui:Destroy() end
@@ -1130,6 +1350,114 @@ function SystemUI:CreateWindow(config)
                 return row
             end
 
+            -- Lock overlay: shows lock icon, prompts for key on click
+            local function ApplyLock(row, lockKey)
+                if not lockKey then return end
+                local overlay = Instance.new("Frame")
+                overlay.Size = UDim2.new(1, 0, 1, 0)
+                overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+                overlay.BackgroundTransparency = 0.45
+                overlay.ZIndex = 10
+                overlay.Parent = row
+                Corner(overlay, 5)
+
+                local lockIc = Icon(overlay, "lock", 14, nil, 0, T.DimText)
+                if lockIc then
+                    lockIc.Position = UDim2.new(0.5, -20, 0.5, -7)
+                    lockIc.ZIndex = 11
+                end
+
+                local lockLbl = Instance.new("TextLabel")
+                lockLbl.BackgroundTransparency = 1
+                lockLbl.Text = "Bloqueado"
+                lockLbl.TextColor3 = T.DimText
+                lockLbl.Font = Enum.Font.GothamBold
+                lockLbl.TextSize = 11
+                lockLbl.Position = UDim2.new(0.5, -4, 0.5, -7)
+                lockLbl.Size = UDim2.new(0.5, 0, 1, 0)
+                lockLbl.TextXAlignment = Enum.TextXAlignment.Left
+                lockLbl.ZIndex = 11
+                lockLbl.Parent = overlay
+
+                local keyPopup = nil
+
+                local clickZone = Instance.new("TextButton")
+                clickZone.Size = UDim2.new(1, 0, 1, 0)
+                clickZone.BackgroundTransparency = 1
+                clickZone.Text = ""
+                clickZone.ZIndex = 12
+                clickZone.Parent = overlay
+
+                clickZone.MouseButton1Click:Connect(function()
+                    if keyPopup and keyPopup.Parent then
+                        keyPopup:Destroy(); keyPopup = nil; return
+                    end
+                    -- Mini key input popup
+                    local rp = row.AbsolutePosition - Main.AbsolutePosition
+                    keyPopup = Instance.new("Frame")
+                    keyPopup.Size = UDim2.new(0, 200, 0, 60)
+                    keyPopup.Position = UDim2.new(0, rp.X, 0, rp.Y + row.AbsoluteSize.Y + 4)
+                    keyPopup.BackgroundColor3 = T.SecondaryBg
+                    keyPopup.BackgroundTransparency = 0.04
+                    keyPopup.ZIndex = 90
+                    keyPopup.Parent = Main
+                    Corner(keyPopup, 6); Stroke(keyPopup, T.Accent, 1, 0.3)
+
+                    local lbl = Instance.new("TextLabel")
+                    lbl.Size = UDim2.new(1, 0, 0, 18)
+                    lbl.Position = UDim2.new(0, 6, 0, 4)
+                    lbl.BackgroundTransparency = 1
+                    lbl.Text = "Digite a Key:"
+                    lbl.TextColor3 = T.DimText
+                    lbl.Font = Enum.Font.GothamBold
+                    lbl.TextSize = 11
+                    lbl.TextXAlignment = Enum.TextXAlignment.Left
+                    lbl.ZIndex = 91
+                    lbl.Parent = keyPopup
+
+                    local tb = Instance.new("TextBox")
+                    tb.Size = UDim2.new(1, -50, 0, 22)
+                    tb.Position = UDim2.new(0, 6, 0, 24)
+                    tb.BackgroundColor3 = T.ComponentBg
+                    tb.BackgroundTransparency = 0.2
+                    tb.Text = ""
+                    tb.PlaceholderText = "Key..."
+                    tb.PlaceholderColor3 = T.DimText
+                    tb.TextColor3 = T.Text
+                    tb.Font = Enum.Font.GothamMedium
+                    tb.TextSize = 12
+                    tb.ZIndex = 91
+                    tb.Parent = keyPopup
+                    Corner(tb, 4); Stroke(tb, T.Accent, 1, 0.5)
+                    Padding(tb, 0, 0, 5, 5)
+
+                    local okBtn = Instance.new("TextButton")
+                    okBtn.Size = UDim2.new(0, 38, 0, 22)
+                    okBtn.Position = UDim2.new(1, -44, 0, 24)
+                    okBtn.BackgroundColor3 = T.Accent
+                    okBtn.BackgroundTransparency = 0.2
+                    okBtn.Text = "OK"
+                    okBtn.TextColor3 = Color3.fromRGB(255,255,255)
+                    okBtn.Font = Enum.Font.GothamBold
+                    okBtn.TextSize = 11
+                    okBtn.ZIndex = 91
+                    okBtn.Parent = keyPopup
+                    Corner(okBtn, 4)
+
+                    okBtn.MouseButton1Click:Connect(function()
+                        if tb.Text == lockKey then
+                            overlay:Destroy()
+                            keyPopup:Destroy(); keyPopup = nil
+                        else
+                            CT(tb, {BackgroundColor3 = T.Error}, 0.1)
+                            task.wait(0.4)
+                            CT(tb, {BackgroundColor3 = T.ComponentBg}, 0.2)
+                            tb.Text = ""
+                        end
+                    end)
+                end)
+            end
+
             -- Helper: add icon to row and return next X offset
             local function RowIcon(row, key, baseX, clr)
                 if not key then return baseX end
@@ -1183,6 +1511,8 @@ function SystemUI:CreateWindow(config)
                     end)
                     if cfg.Callback then task.spawn(cfg.Callback) end
                 end)
+
+                if cfg.Locked or cfg.LockKey then ApplyLock(row, cfg.LockKey or "UNLOCK") end
             end
 
             -- ----------------------------------------------------------------
@@ -1250,6 +1580,8 @@ function SystemUI:CreateWindow(config)
                 end)
 
                 if cfg.Callback and state then task.spawn(cfg.Callback, state) end
+
+                if cfg.Locked or cfg.LockKey then ApplyLock(row, cfg.LockKey or "UNLOCK") end
 
                 local ctrl = {}
                 function ctrl:Set(v)
@@ -1384,6 +1716,8 @@ function SystemUI:CreateWindow(config)
                 end))
 
                 if cfg.Callback then task.spawn(cfg.Callback, val) end
+
+                if cfg.Locked or cfg.LockKey then ApplyLock(row, cfg.LockKey or "UNLOCK") end
 
                 local ctrl = {}
                 function ctrl:Set(v)
@@ -2196,19 +2530,30 @@ function SystemUI:CreateWindow(config)
                 Corner(refRow, 5)
                 RC(refRow, "BackgroundColor3", "ComponentBg")
 
-                local refIc = Icon(refRow, "rotate-cw", 13, 10, 0, T.Accent)
+                -- Icon at left
+                local refIc = Icon(refRow, "rotatecw", 13, 10, 0, T.Accent)
                 if refIc then RC(refIc, "ImageColor3", "Accent") end
 
+                -- Text label beside icon
+                local refLbl = Instance.new("TextLabel")
+                refLbl.BackgroundTransparency = 1
+                refLbl.Text = "Refresh"
+                refLbl.TextColor3 = T.Accent
+                refLbl.Font = Enum.Font.GothamBold
+                refLbl.TextSize = 12
+                refLbl.Position = UDim2.new(0, 30, 0, 0)
+                refLbl.Size = UDim2.new(1, -30, 1, 0)
+                refLbl.TextXAlignment = Enum.TextXAlignment.Left
+                refLbl.Parent = refRow
+                RC(refLbl, "TextColor3", "Accent")
+
+                -- Invisible click zone over full row
                 local refBtn = Instance.new("TextButton")
                 refBtn.Size = UDim2.new(1, 0, 1, 0)
                 refBtn.BackgroundTransparency = 1
-                refBtn.Text = "  Refresh"
-                refBtn.TextColor3 = T.Accent
-                refBtn.Font = Enum.Font.GothamBold
-                refBtn.TextSize = 12
-                refBtn.TextXAlignment = Enum.TextXAlignment.Left
+                refBtn.Text = ""
+                refBtn.ZIndex = 5
                 refBtn.Parent = refRow
-                RC(refBtn, "TextColor3", "Accent")
                 refBtn.MouseButton1Click:Connect(Build)
             end
 
