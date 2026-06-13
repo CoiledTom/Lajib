@@ -22,23 +22,29 @@ local Player           = Players.LocalPlayer
 
 -- =========================================================================
 --  ICONS  — Icons2.lua (raw numeric IDs, no dashes in keys)
+--           Falls back to Icons.lua if Icons2 not found
 -- =========================================================================
 local Icons = {}
 do
-    local ok, result = pcall(function()
-        return loadstring(game:HttpGet(
-            "https://raw.githubusercontent.com/CoiledTom/Lajib/refs/heads/main/Icons2.lua",
-            true
-        ))()
-    end)
-    if ok and type(result) == "table" then
-        for k, v in pairs(result) do
-            if type(v) == "number" then
-                Icons[k] = "rbxassetid://" .. tostring(v)
-            elseif type(v) == "string" then
-                Icons[k] = v
+    local function LoadIconFile(url)
+        local ok, result = pcall(function()
+            return loadstring(game:HttpGet(url, true))()
+        end)
+        if ok and type(result) == "table" then
+            for k, v in pairs(result) do
+                if type(v) == "number" then
+                    Icons[k] = "rbxassetid://" .. tostring(v)
+                elseif type(v) == "string" then
+                    Icons[k] = v
+                end
             end
+            return true
         end
+        return false
+    end
+    -- Try Icons2 first, fall back to Icons
+    if not LoadIconFile("https://raw.githubusercontent.com/CoiledTom/Lajib/refs/heads/main/Icons2.lua") then
+        LoadIconFile("https://raw.githubusercontent.com/CoiledTom/Lajib/refs/heads/main/Icons.lua")
     end
 end
 
@@ -593,9 +599,103 @@ local function SendNotif(cfg, T)
     end)
 end
 
--- =========================================================================
---  LIBRARY
--- =========================================================================
+-- Module-level Confirm (Y/N) — called by BClose before Win object exists
+local function SendConfirm(cfg, T)
+    EnsureNotifGui()
+    local dur   = cfg.Duration or 12
+    local onYes = cfg.OnYes    or function() end
+    local onNo  = cfg.OnNo     or function() end
+
+    local F = Instance.new("Frame")
+    F.Size = UDim2.new(1, 30, 0, 100)
+    F.BackgroundColor3 = T.NotifBg
+    F.BackgroundTransparency = 0.06
+    F.ClipsDescendants = true
+    F.Parent = _notifContainer
+    Corner(F, 8); Stroke(F, T.Warning, 1.5, 0.2)
+
+    Icon(F, "trianglealert", 18, 10, -16, T.Warning)
+
+    local titleLbl = Instance.new("TextLabel")
+    titleLbl.Size = UDim2.new(1, -46, 0, 20)
+    titleLbl.Position = UDim2.new(0, 36, 0, 8)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Text = cfg.Title or "Tem certeza?"
+    titleLbl.TextColor3 = T.Warning
+    titleLbl.Font = Enum.Font.GothamBold
+    titleLbl.TextSize = 13
+    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    titleLbl.Parent = F
+
+    local descLbl = Instance.new("TextLabel")
+    descLbl.Size = UDim2.new(1, -46, 0, 20)
+    descLbl.Position = UDim2.new(0, 36, 0, 28)
+    descLbl.BackgroundTransparency = 1
+    descLbl.Text = cfg.Desc or ""
+    descLbl.TextColor3 = T.DimText
+    descLbl.Font = Enum.Font.Gotham
+    descLbl.TextSize = 11
+    descLbl.TextWrapped = true
+    descLbl.TextXAlignment = Enum.TextXAlignment.Left
+    descLbl.Parent = F
+
+    local timerL = Instance.new("TextLabel")
+    timerL.Size = UDim2.new(0, 28, 0, 16)
+    timerL.Position = UDim2.new(1, -32, 0, 8)
+    timerL.BackgroundTransparency = 1
+    timerL.Text = tostring(dur)
+    timerL.TextColor3 = T.DimText
+    timerL.Font = Enum.Font.GothamBold
+    timerL.TextSize = 11
+    timerL.TextXAlignment = Enum.TextXAlignment.Right
+    timerL.Parent = F
+
+    local yBtn = Instance.new("TextButton")
+    yBtn.Size = UDim2.new(0.48, -2, 0, 26)
+    yBtn.Position = UDim2.new(0, 6, 1, -32)
+    yBtn.BackgroundColor3 = T.Success
+    yBtn.BackgroundTransparency = 0.2
+    yBtn.Text = "✓  Sim"
+    yBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    yBtn.Font = Enum.Font.GothamBold
+    yBtn.TextSize = 12
+    yBtn.ZIndex = 2
+    Corner(yBtn, 5); yBtn.Parent = F
+
+    local nBtn = Instance.new("TextButton")
+    nBtn.Size = UDim2.new(0.48, -2, 0, 26)
+    nBtn.Position = UDim2.new(0.5, 2, 1, -32)
+    nBtn.BackgroundColor3 = T.Error
+    nBtn.BackgroundTransparency = 0.2
+    nBtn.Text = "✕  Não"
+    nBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    nBtn.Font = Enum.Font.GothamBold
+    nBtn.TextSize = 12
+    nBtn.ZIndex = 2
+    Corner(nBtn, 5); nBtn.Parent = F
+
+    CT(F, {Size = UDim2.new(1, 0, 0, 100)}, 0.4, Enum.EasingStyle.Back)
+
+    local dismissed = false
+    local function Dismiss()
+        if dismissed then return end; dismissed = true
+        CT(F, {BackgroundTransparency = 1, Size = UDim2.new(1, 30, 0, 100)}, 0.3)
+        task.wait(0.35)
+        if F and F.Parent then F:Destroy() end
+    end
+
+    yBtn.MouseButton1Click:Connect(function() task.spawn(onYes); Dismiss() end)
+    nBtn.MouseButton1Click:Connect(function() task.spawn(onNo);  Dismiss() end)
+
+    task.spawn(function()
+        local rem = dur
+        while rem > 0 and not dismissed and F.Parent do
+            task.wait(1); rem = rem - 1
+            if F.Parent then timerL.Text = tostring(rem) end
+        end
+        if not dismissed then Dismiss() end
+    end)
+end
 local SystemUI = {}
 
 function SystemUI:CreateWindow(config)
@@ -607,9 +707,17 @@ function SystemUI:CreateWindow(config)
     local wTheme      = config.Theme       or "Holographic"
     local T           = Themes[wTheme]     or Themes.Holographic
     -- Bubble (shrink-to-dot) config
-    local bImage      = config.BubbleImage
-    local bText       = config.BubbleText  or "S.M"
-    local bSize       = config.BubbleSize  or 52
+    -- BubbleImage: rbxassetid:// string → shows image
+    -- BubbleText: plain text → shows text
+    -- If BubbleText looks like an asset ID, treat it as BubbleImage
+    local bImage = config.BubbleImage
+    local bText  = config.BubbleText or "S.M"
+    local bSize  = config.BubbleSize or 52
+    -- Auto-detect asset ID passed into BubbleText
+    if not bImage and tostring(bText):match("^rbxassetid://") then
+        bImage = tostring(bText)
+        bText  = "S.M"
+    end
     local cfgName     = wTitle:gsub("%s+", "_")
     local savedCfg    = LoadConfig(cfgName)
     local cfgData     = {}
@@ -799,23 +907,31 @@ function SystemUI:CreateWindow(config)
         return b
     end
 
-    -- Icon-based button (for close)
+    -- Icon-based button (for close) — falls back to text if icon not loaded
     local function WinIconBtn(iconKey, clr)
         local b = Instance.new("TextButton")
         b.Size = UDim2.new(0, 24, 0, 22)
         b.BackgroundColor3 = T.ComponentBg
         b.BackgroundTransparency = 0.35
-        b.Text = ""
         b.ZIndex = 6; b.Parent = BtnRow
         Corner(b, 4); Stroke(b, clr, 1, 0.55)
         local ic = Icon(b, iconKey, 12, 6, 0, clr)
+        if ic then
+            b.Text = ""
+        else
+            -- fallback text if icon not loaded
+            b.Text = "✕"; b.TextColor3 = clr
+            b.Font = Enum.Font.GothamBold; b.TextSize = 12
+        end
         b.MouseEnter:Connect(function()
             CT(b, {BackgroundTransparency = 0}, 0.12)
-            if ic then CT(ic, {ImageColor3 = Color3.fromRGB(255,255,255)}, 0.12) end
+            if ic then CT(ic, {ImageColor3 = Color3.fromRGB(255,255,255)}, 0.12)
+            else CT(b, {TextColor3 = Color3.fromRGB(255,255,255)}, 0.12) end
         end)
         b.MouseLeave:Connect(function()
             CT(b, {BackgroundTransparency = 0.35}, 0.12)
-            if ic then CT(ic, {ImageColor3 = clr}, 0.12) end
+            if ic then CT(ic, {ImageColor3 = clr}, 0.12)
+            else CT(b, {TextColor3 = clr}, 0.12) end
         end)
         return b
     end
@@ -1097,115 +1213,7 @@ function SystemUI:CreateWindow(config)
 
     -- Confirm notification with Y / N buttons
     function Win:Confirm(cfg)
-        cfg = cfg or {}
-        EnsureNotifGui()
-        local dur    = cfg.Duration or 12
-        local onYes  = cfg.OnYes   or function() end
-        local onNo   = cfg.OnNo    or function() end
-
-        local F = Instance.new("Frame")
-        F.Size = UDim2.new(1, 30, 0, 96)
-        F.BackgroundColor3 = T.NotifBg
-        F.BackgroundTransparency = 0.06
-        F.ClipsDescendants = true
-        F.Parent = _notifContainer
-        Corner(F, 8); Stroke(F, T.Warning, 1.5, 0.2)
-
-        -- icon (alert)
-        Icon(F, "alerttriangle", 18, 10, -14, T.Warning)
-
-        local titleLbl = Instance.new("TextLabel")
-        titleLbl.Size = UDim2.new(1, -42, 0, 20)
-        titleLbl.Position = UDim2.new(0, 36, 0, 7)
-        titleLbl.BackgroundTransparency = 1
-        titleLbl.Text = cfg.Title or "Tem certeza?"
-        titleLbl.TextColor3 = T.Warning
-        titleLbl.Font = Enum.Font.GothamBold
-        titleLbl.TextSize = 13
-        titleLbl.TextXAlignment = Enum.TextXAlignment.Left
-        titleLbl.Parent = F
-
-        local descLbl = Instance.new("TextLabel")
-        descLbl.Size = UDim2.new(1, -42, 0, 22)
-        descLbl.Position = UDim2.new(0, 36, 0, 27)
-        descLbl.BackgroundTransparency = 1
-        descLbl.Text = cfg.Desc or ""
-        descLbl.TextColor3 = T.DimText
-        descLbl.Font = Enum.Font.Gotham
-        descLbl.TextSize = 11
-        descLbl.TextWrapped = true
-        descLbl.TextXAlignment = Enum.TextXAlignment.Left
-        descLbl.Parent = F
-
-        local timerLbl = Instance.new("TextLabel")
-        timerLbl.Size = UDim2.new(0, 32, 0, 16)
-        timerLbl.Position = UDim2.new(1, -36, 0, 7)
-        timerLbl.BackgroundTransparency = 1
-        timerLbl.Text = string.format("%.0f", dur)
-        timerLbl.TextColor3 = T.DimText
-        timerLbl.Font = Enum.Font.GothamBold
-        timerLbl.TextSize = 11
-        timerLbl.TextXAlignment = Enum.TextXAlignment.Right
-        timerLbl.Parent = F
-
-        -- Y button
-        local yBtn = Instance.new("TextButton")
-        yBtn.Size = UDim2.new(0.48, -2, 0, 26)
-        yBtn.Position = UDim2.new(0, 6, 1, -32)
-        yBtn.BackgroundColor3 = T.Success
-        yBtn.BackgroundTransparency = 0.2
-        yBtn.Text = "✓  Sim"
-        yBtn.TextColor3 = Color3.fromRGB(255,255,255)
-        yBtn.Font = Enum.Font.GothamBold
-        yBtn.TextSize = 12
-        yBtn.ZIndex = 2
-        Corner(yBtn, 5)
-        yBtn.Parent = F
-
-        -- N button
-        local nBtn = Instance.new("TextButton")
-        nBtn.Size = UDim2.new(0.48, -2, 0, 26)
-        nBtn.Position = UDim2.new(0.5, 2, 1, -32)
-        nBtn.BackgroundColor3 = T.Error
-        nBtn.BackgroundTransparency = 0.2
-        nBtn.Text = "✕  Não"
-        nBtn.TextColor3 = Color3.fromRGB(255,255,255)
-        nBtn.Font = Enum.Font.GothamBold
-        nBtn.TextSize = 12
-        nBtn.ZIndex = 2
-        Corner(nBtn, 5)
-        nBtn.Parent = F
-
-        CT(F, {Size = UDim2.new(1, 0, 0, 96)}, 0.4, Enum.EasingStyle.Back)
-
-        local dismissed = false
-        local function Dismiss()
-            if dismissed then return end
-            dismissed = true
-            CT(F, {BackgroundTransparency = 1, Size = UDim2.new(1, 30, 0, 96)}, 0.3)
-            task.wait(0.35)
-            if F and F.Parent then F:Destroy() end
-        end
-
-        yBtn.MouseButton1Click:Connect(function()
-            task.spawn(onYes); Dismiss()
-        end)
-        nBtn.MouseButton1Click:Connect(function()
-            task.spawn(onNo); Dismiss()
-        end)
-
-        -- countdown
-        task.spawn(function()
-            local rem = dur
-            while rem > 0 and not dismissed and F.Parent do
-                task.wait(1)
-                rem = rem - 1
-                if F.Parent then
-                    timerLbl.Text = string.format("%.0f", rem)
-                end
-            end
-            if not dismissed then Dismiss() end
-        end)
+        SendConfirm(cfg, T)
     end
 
     function Win:Destroy()
@@ -1407,10 +1415,29 @@ function SystemUI:CreateWindow(config)
                 local lockKey       = (type(cfg_lock) == "table") and cfg_lock.LockKey or cfg_lock
                 local lockType      = (type(cfg_lock) == "table") and (cfg_lock.LockType or "fixed"):lower() or "fixed"
                 local lockServiceID = (type(cfg_lock) == "table") and (cfg_lock.LockServiceID or "") or ""
+                local lockGetKeyURL = (type(cfg_lock) == "table") and (cfg_lock.LockGetKeyURL or "") or ""
 
                 if not lockKey then return end
 
-                -- Already unlocked from previous session or this session?
+                -- Check if already unlocked this session
+                if _unlockedKeys[lockKey] then return end
+
+                -- Check saved key from previous session
+                pcall(function()
+                    if readfile then
+                        local saved = readfile("SystemUI_Lock_" .. cfgName .. "_" .. lockKey .. ".key")
+                        if saved and saved ~= "" then
+                            -- Re-validate silently or just accept fixed key
+                            if lockType ~= "panda" then
+                                if saved == lockKey or lockType == "fixed" then
+                                    _unlockedKeys[lockKey] = true
+                                    return
+                                end
+                            end
+                            -- For panda, store for pre-filling input later
+                        end
+                    end
+                end)
                 if _unlockedKeys[lockKey] then return end
 
                 -- Register overlay for group-unlock
@@ -1569,21 +1596,44 @@ function SystemUI:CreateWindow(config)
                     statusLbl.ZIndex = 97
                     statusLbl.Parent = keyPopup
 
-                    -- Confirm button
+                    -- Confirm button (shrink to leave room for Get Key btn)
                     local okBtn = Instance.new("TextButton")
-                    okBtn.Size = UDim2.new(1, -20, 0, 28)
+                    okBtn.Size  = lockGetKeyURL ~= "" and UDim2.new(0.55, -6, 0, 28) or UDim2.new(1, -20, 0, 28)
                     okBtn.Position = UDim2.new(0, 10, 0, 108)
                     okBtn.BackgroundColor3 = T.Accent
                     okBtn.BackgroundTransparency = 0.2
-                    okBtn.Text = lockType == "panda" and "Validar (Panda)" or "Confirmar"
+                    okBtn.Text = lockType == "panda" and "Verificar (Panda)" or "Confirmar"
                     okBtn.TextColor3 = Color3.fromRGB(255,255,255)
                     okBtn.Font = Enum.Font.GothamBold
-                    okBtn.TextSize = 13
+                    okBtn.TextSize = 12
                     okBtn.ZIndex = 97
                     okBtn.Parent = keyPopup
                     Corner(okBtn, 6)
                     okBtn.MouseEnter:Connect(function() CT(okBtn,{BackgroundTransparency=0},0.12) end)
                     okBtn.MouseLeave:Connect(function() CT(okBtn,{BackgroundTransparency=0.2},0.12) end)
+
+                    -- Get Key button (shown only when lockGetKeyURL is provided)
+                    if lockGetKeyURL ~= "" then
+                        local gkBtn = Instance.new("TextButton")
+                        gkBtn.Size = UDim2.new(0.42, -4, 0, 28)
+                        gkBtn.Position = UDim2.new(0.58, -6, 0, 108)
+                        gkBtn.BackgroundColor3 = T.ComponentBg
+                        gkBtn.BackgroundTransparency = 0.2
+                        gkBtn.Text = "Get Key"
+                        gkBtn.TextColor3 = T.Accent
+                        gkBtn.Font = Enum.Font.GothamBold
+                        gkBtn.TextSize = 12
+                        gkBtn.ZIndex = 97
+                        gkBtn.Parent = keyPopup
+                        Corner(gkBtn, 6)
+                        Stroke(gkBtn, T.Accent, 1, 0.5)
+                        gkBtn.MouseEnter:Connect(function() CT(gkBtn,{BackgroundTransparency=0},0.12) end)
+                        gkBtn.MouseLeave:Connect(function() CT(gkBtn,{BackgroundTransparency=0.2},0.12) end)
+                        gkBtn.MouseButton1Click:Connect(function()
+                            pcall(function() if setclipboard then setclipboard(lockGetKeyURL) end end)
+                            statusLbl.Text = "Link copiado!"; statusLbl.TextColor3 = T.Accent
+                        end)
+                    end
 
                     -- Close popup when clicking dim overlay
                     local dimBtn = Instance.new("TextButton")
@@ -1604,43 +1654,62 @@ function SystemUI:CreateWindow(config)
                             local msg   = "Key inválida."
 
                             if lockType == "panda" and lockServiceID ~= "" then
-                                -- PandAuth V2 API
-                                local hwid = tostring(pcall(function()
-                                    return game:GetService("RbxAnalyticsService"):GetClientId()
-                                end) and game:GetService("RbxAnalyticsService"):GetClientId() or
-                                    tostring(game.Players.LocalPlayer.UserId))
-
-                                local url = string.format(
-                                    "https://pandadevelopment.net/v2_validation?service=%s&hwid=%s&key=%s",
-                                    lockServiceID, hwid, input)
-
-                                local ok, raw = pcall(function() return game:HttpGet(url, true) end)
-                                if ok then
+                                -- PandAuth — POST para API oficial
+                                local function HttpReq(opts)
+                                    if syn and syn.request       then return syn.request(opts)
+                                    elseif http and http.request then return http.request(opts)
+                                    elseif http_request          then return http_request(opts)
+                                    elseif request               then return request(opts) end
+                                end
+                                local function GetHWID()
+                                    local ok, h = pcall(gethwid)
+                                    if ok and h then return h end
+                                    local ok2, h2 = pcall(function()
+                                        return tostring(game:GetService("RbxAnalyticsService"):GetClientId()):gsub("-","")
+                                    end)
+                                    return (ok2 and h2) or tostring(Players.LocalPlayer.UserId)
+                                end
+                                local ok, res = pcall(HttpReq, {
+                                    Url    = "https://new.pandadevelopment.net/api/v1/keys/validate",
+                                    Method = "POST",
+                                    Headers = { ["Content-Type"] = "application/json" },
+                                    Body    = game:GetService("HttpService"):JSONEncode({
+                                        ServiceID = lockServiceID,
+                                        HWID      = GetHWID(),
+                                        Key       = input,
+                                    }),
+                                })
+                                if ok and res then
                                     local ok2, data = pcall(function()
-                                        return game:GetService("HttpService"):JSONDecode(raw)
+                                        return game:GetService("HttpService"):JSONDecode(res.Body)
                                     end)
                                     if ok2 and type(data) == "table" then
-                                        valid = data.V2_Authentication == true
+                                        valid = data.Authenticated_Status == "Success"
                                         msg   = valid and "✓ Key Panda válida!" or "✕ Key inválida ou expirada."
                                     else
                                         msg = "✕ Erro ao processar resposta."
                                     end
                                 else
-                                    msg = "✕ Erro de rede."
+                                    msg = "✕ Erro de rede (PandAuth)."
                                 end
                             else
-                                -- Fixed key comparison
                                 valid = (input == lockKey)
                                 msg   = valid and "✓ Desbloqueado!" or "✕ Key incorreta."
                             end
 
-                            okBtn.Text = lockType == "panda" and "Validar (Panda)" or "Confirmar"
+                            okBtn.Text = lockType == "panda" and "Verificar (Panda)" or "Confirmar"
 
                             if valid then
                                 statusLbl.Text = msg; statusLbl.TextColor3 = T.Success
+                                -- Salva key pra não precisar redigitar
+                                pcall(function()
+                                    if writefile then
+                                        writefile("SystemUI_Lock_" .. cfgName .. "_" .. lockKey .. ".key", input)
+                                    end
+                                end)
                                 task.wait(0.5)
                                 ClosePopup()
-                                _UnlockKey(lockKey)  -- unlock ALL components with same key
+                                _UnlockKey(lockKey)
                             else
                                 statusLbl.Text = msg; statusLbl.TextColor3 = T.Error
                                 CT(ibg, {BackgroundColor3 = Color3.fromRGB(60, 20, 20)}, 0.1)
