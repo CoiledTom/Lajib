@@ -615,6 +615,50 @@ function SystemUI:CreateWindow(config)
     local cfgData     = {}
     local conns       = {}
 
+    -- -----------------------------------------------------------------------
+    --  LOCK KEY REGISTRY  (group unlock + persistence)
+    -- -----------------------------------------------------------------------
+    local _unlockedKeys = {}   -- key → true
+    local _lockOverlays = {}   -- key → {overlay, overlay, ...}
+
+    -- Load previously saved unlock state
+    pcall(function()
+        if readfile then
+            local raw = readfile("SystemUI_Locks_" .. cfgName .. ".json")
+            if raw then
+                local ok, saved = pcall(function()
+                    return game:GetService("HttpService"):JSONDecode(raw)
+                end)
+                if ok and type(saved) == "table" then _unlockedKeys = saved end
+            end
+        end
+    end)
+
+    local function _SaveUnlocked()
+        pcall(function()
+            if writefile then
+                writefile("SystemUI_Locks_" .. cfgName .. ".json",
+                    game:GetService("HttpService"):JSONEncode(_unlockedKeys))
+            end
+        end)
+    end
+
+    -- Unlock all overlays sharing the same key
+    local function _UnlockKey(key)
+        _unlockedKeys[key] = true
+        _SaveUnlocked()
+        local list = _lockOverlays[key] or {}
+        for _, ov in ipairs(list) do
+            if ov and ov.Parent then
+                CT(ov, {BackgroundTransparency = 1}, 0.22)
+                task.delay(0.26, function()
+                    if ov and ov.Parent then ov:Destroy() end
+                end)
+            end
+        end
+        _lockOverlays[key] = {}
+    end
+
     -- Color registry for live theme switching
     local colorRefs = {}
     local function RC(obj, prop, key)
@@ -994,13 +1038,21 @@ function SystemUI:CreateWindow(config)
         visible = false
     end)
 
-    -- [✕] Close
+    -- [✕] Close — Pede confirmação antes de fechar
     BClose.MouseButton1Click:Connect(function()
-        CT(Main, {Size = UDim2.new(0,0,0,0), BackgroundTransparency = 1}, 0.28)
-        Bubble.Visible = false
-        task.wait(0.32)
-        Gui:Destroy()
-        for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
+        SendConfirm({
+            Title    = "Fechar GUI?",
+            Desc     = "Tem certeza que quer fechar a GUI?",
+            Duration = 10,
+            OnYes    = function()
+                CT(Main, {Size = UDim2.new(0,0,0,0), BackgroundTransparency = 1}, 0.28)
+                Bubble.Visible = false
+                task.wait(0.32)
+                Gui:Destroy()
+                for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
+            end,
+            OnNo = function() end,
+        }, T)
     end)
 
     table.insert(conns, UserInputService.InputBegan:Connect(function(i, gpe)
@@ -1350,22 +1402,42 @@ function SystemUI:CreateWindow(config)
                 return row
             end
 
-            -- Lock overlay: shows lock icon, prompts for key on click
-            local function ApplyLock(row, lockKey)
+            -- Lock overlay — center popup, group unlock, fixed/panda validation, key saved
+            local function ApplyLock(row, cfg_lock)
+                local lockKey       = (type(cfg_lock) == "table") and cfg_lock.LockKey or cfg_lock
+                local lockType      = (type(cfg_lock) == "table") and (cfg_lock.LockType or "fixed"):lower() or "fixed"
+                local lockServiceID = (type(cfg_lock) == "table") and (cfg_lock.LockServiceID or "") or ""
+
                 if not lockKey then return end
+
+                -- Already unlocked from previous session or this session?
+                if _unlockedKeys[lockKey] then return end
+
+                -- Register overlay for group-unlock
+                if not _lockOverlays[lockKey] then _lockOverlays[lockKey] = {} end
+
+                -- Build overlay
                 local overlay = Instance.new("Frame")
                 overlay.Size = UDim2.new(1, 0, 1, 0)
                 overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-                overlay.BackgroundTransparency = 0.45
+                overlay.BackgroundTransparency = 0.42
                 overlay.ZIndex = 10
                 overlay.Parent = row
                 Corner(overlay, 5)
 
-                local lockIc = Icon(overlay, "lock", 14, nil, 0, T.DimText)
-                if lockIc then
-                    lockIc.Position = UDim2.new(0.5, -20, 0.5, -7)
-                    lockIc.ZIndex = 11
-                end
+                table.insert(_lockOverlays[lockKey], overlay)
+
+                -- Lock icon + label centered on overlay
+                local lockInner = Instance.new("Frame")
+                lockInner.Size = UDim2.new(0, 110, 1, 0)
+                lockInner.AnchorPoint = Vector2.new(0.5, 0)
+                lockInner.Position = UDim2.new(0.5, 0, 0, 0)
+                lockInner.BackgroundTransparency = 1
+                lockInner.ZIndex = 11
+                lockInner.Parent = overlay
+
+                local lockIc = Icon(lockInner, "lock", 14, 0, 0, T.DimText)
+                if lockIc then lockIc.ZIndex = 12 end
 
                 local lockLbl = Instance.new("TextLabel")
                 lockLbl.BackgroundTransparency = 1
@@ -1373,87 +1445,209 @@ function SystemUI:CreateWindow(config)
                 lockLbl.TextColor3 = T.DimText
                 lockLbl.Font = Enum.Font.GothamBold
                 lockLbl.TextSize = 11
-                lockLbl.Position = UDim2.new(0.5, -4, 0.5, -7)
-                lockLbl.Size = UDim2.new(0.5, 0, 1, 0)
+                lockLbl.Position = UDim2.new(0, 20, 0, 0)
+                lockLbl.Size = UDim2.new(1, -20, 1, 0)
                 lockLbl.TextXAlignment = Enum.TextXAlignment.Left
-                lockLbl.ZIndex = 11
-                lockLbl.Parent = overlay
+                lockLbl.ZIndex = 12
+                lockLbl.Parent = lockInner
 
                 local keyPopup = nil
+                local popOverlay = nil  -- dark bg overlay on Gui
+
+                local function ClosePopup()
+                    if popOverlay and popOverlay.Parent then popOverlay:Destroy(); popOverlay = nil end
+                    if keyPopup  and keyPopup.Parent  then keyPopup:Destroy();   keyPopup  = nil end
+                end
 
                 local clickZone = Instance.new("TextButton")
                 clickZone.Size = UDim2.new(1, 0, 1, 0)
                 clickZone.BackgroundTransparency = 1
                 clickZone.Text = ""
-                clickZone.ZIndex = 12
+                clickZone.ZIndex = 13
                 clickZone.Parent = overlay
 
                 clickZone.MouseButton1Click:Connect(function()
-                    if keyPopup and keyPopup.Parent then
-                        keyPopup:Destroy(); keyPopup = nil; return
-                    end
-                    -- Mini key input popup
-                    local rp = row.AbsolutePosition - Main.AbsolutePosition
+                    if keyPopup and keyPopup.Parent then ClosePopup(); return end
+
+                    -- Semi-transparent dim layer parented to Gui
+                    popOverlay = Instance.new("Frame")
+                    popOverlay.Size = UDim2.new(1, 0, 1, 0)
+                    popOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+                    popOverlay.BackgroundTransparency = 0.6
+                    popOverlay.ZIndex = 95
+                    popOverlay.Parent = Gui
+
+                    -- Center popup card parented to Gui
                     keyPopup = Instance.new("Frame")
-                    keyPopup.Size = UDim2.new(0, 200, 0, 60)
-                    keyPopup.Position = UDim2.new(0, rp.X, 0, rp.Y + row.AbsoluteSize.Y + 4)
+                    keyPopup.Size = UDim2.new(0, 300, 0, 150)
+                    keyPopup.AnchorPoint = Vector2.new(0.5, 0.5)
+                    keyPopup.Position = UDim2.new(0.5, 0, 0.5, 0)
                     keyPopup.BackgroundColor3 = T.SecondaryBg
                     keyPopup.BackgroundTransparency = 0.04
-                    keyPopup.ZIndex = 90
-                    keyPopup.Parent = Main
-                    Corner(keyPopup, 6); Stroke(keyPopup, T.Accent, 1, 0.3)
+                    keyPopup.ZIndex = 96
+                    keyPopup.Parent = Gui
+                    Corner(keyPopup, 10)
+                    Stroke(keyPopup, T.Accent, 1.5, 0.25)
 
-                    local lbl = Instance.new("TextLabel")
-                    lbl.Size = UDim2.new(1, 0, 0, 18)
-                    lbl.Position = UDim2.new(0, 6, 0, 4)
-                    lbl.BackgroundTransparency = 1
-                    lbl.Text = "Digite a Key:"
-                    lbl.TextColor3 = T.DimText
-                    lbl.Font = Enum.Font.GothamBold
-                    lbl.TextSize = 11
-                    lbl.TextXAlignment = Enum.TextXAlignment.Left
-                    lbl.ZIndex = 91
-                    lbl.Parent = keyPopup
+                    -- Popup header
+                    local pHeader = Instance.new("Frame")
+                    pHeader.Size = UDim2.new(1, 0, 0, 38)
+                    pHeader.BackgroundColor3 = T.HeaderBg
+                    pHeader.BackgroundTransparency = 0.06
+                    pHeader.BorderSizePixel = 0
+                    pHeader.ZIndex = 97
+                    pHeader.Parent = keyPopup
+                    Corner(pHeader, 10)
+                    -- square bottom
+                    local pHB = Instance.new("Frame")
+                    pHB.Size = UDim2.new(1, 0, 0, 10); pHB.Position = UDim2.new(0,0,1,-10)
+                    pHB.BackgroundColor3 = T.HeaderBg; pHB.BackgroundTransparency = 0.06
+                    pHB.BorderSizePixel = 0; pHB.ZIndex = 97; pHB.Parent = pHeader
+
+                    local pTitle = Instance.new("TextLabel")
+                    pTitle.BackgroundTransparency = 1
+                    pTitle.Text = lockType == "panda" and "🔑 Verificar Key (Panda)" or "🔑 Inserir Key"
+                    pTitle.TextColor3 = T.Accent
+                    pTitle.Font = Enum.Font.GothamBold
+                    pTitle.TextSize = 13
+                    pTitle.Position = UDim2.new(0, 10, 0, 0)
+                    pTitle.Size = UDim2.new(1, -50, 1, 0)
+                    pTitle.TextXAlignment = Enum.TextXAlignment.Left
+                    pTitle.ZIndex = 98
+                    pTitle.Parent = pHeader
+
+                    -- Close (×) button in popup
+                    local xBtn = Instance.new("TextButton")
+                    xBtn.Size = UDim2.new(0, 26, 0, 26)
+                    xBtn.Position = UDim2.new(1, -32, 0.5, -13)
+                    xBtn.BackgroundColor3 = T.Error
+                    xBtn.BackgroundTransparency = 0.4
+                    xBtn.Text = "✕"; xBtn.TextColor3 = Color3.fromRGB(255,255,255)
+                    xBtn.Font = Enum.Font.GothamBold; xBtn.TextSize = 12
+                    xBtn.ZIndex = 98; xBtn.Parent = pHeader; Corner(xBtn, 5)
+                    xBtn.MouseButton1Click:Connect(ClosePopup)
+
+                    -- Input
+                    local ibg = Instance.new("Frame")
+                    ibg.Size = UDim2.new(1, -20, 0, 34)
+                    ibg.Position = UDim2.new(0, 10, 0, 48)
+                    ibg.BackgroundColor3 = T.ComponentBg
+                    ibg.BackgroundTransparency = 0.2
+                    ibg.BorderSizePixel = 0
+                    ibg.ZIndex = 97
+                    ibg.Parent = keyPopup
+                    Corner(ibg, 6)
+                    local isk = Stroke(ibg, T.Accent, 1, 0.6)
 
                     local tb = Instance.new("TextBox")
-                    tb.Size = UDim2.new(1, -50, 0, 22)
-                    tb.Position = UDim2.new(0, 6, 0, 24)
-                    tb.BackgroundColor3 = T.ComponentBg
-                    tb.BackgroundTransparency = 0.2
+                    tb.Size = UDim2.new(1, -12, 1, 0)
+                    tb.Position = UDim2.new(0, 6, 0, 0)
+                    tb.BackgroundTransparency = 1
                     tb.Text = ""
-                    tb.PlaceholderText = "Key..."
+                    tb.PlaceholderText = lockType == "panda" and "Sua key Panda..." or "Sua key..."
                     tb.PlaceholderColor3 = T.DimText
                     tb.TextColor3 = T.Text
                     tb.Font = Enum.Font.GothamMedium
-                    tb.TextSize = 12
-                    tb.ZIndex = 91
-                    tb.Parent = keyPopup
-                    Corner(tb, 4); Stroke(tb, T.Accent, 1, 0.5)
+                    tb.TextSize = 13
+                    tb.ClearTextOnFocus = false
+                    tb.ZIndex = 98
+                    tb.Parent = ibg
                     Padding(tb, 0, 0, 5, 5)
+                    tb.Focused:Connect(function() CT(ibg,{BackgroundTransparency=0.04},0.14); CT(isk,{Transparency=0.15},0.14) end)
+                    tb.FocusLost:Connect(function() CT(ibg,{BackgroundTransparency=0.2},0.14); CT(isk,{Transparency=0.6},0.14) end)
 
+                    -- Status label
+                    local statusLbl = Instance.new("TextLabel")
+                    statusLbl.BackgroundTransparency = 1
+                    statusLbl.Text = ""
+                    statusLbl.TextColor3 = T.DimText
+                    statusLbl.Font = Enum.Font.Gotham
+                    statusLbl.TextSize = 11
+                    statusLbl.Position = UDim2.new(0, 10, 0, 88)
+                    statusLbl.Size = UDim2.new(1, -20, 0, 14)
+                    statusLbl.TextXAlignment = Enum.TextXAlignment.Left
+                    statusLbl.ZIndex = 97
+                    statusLbl.Parent = keyPopup
+
+                    -- Confirm button
                     local okBtn = Instance.new("TextButton")
-                    okBtn.Size = UDim2.new(0, 38, 0, 22)
-                    okBtn.Position = UDim2.new(1, -44, 0, 24)
+                    okBtn.Size = UDim2.new(1, -20, 0, 28)
+                    okBtn.Position = UDim2.new(0, 10, 0, 108)
                     okBtn.BackgroundColor3 = T.Accent
                     okBtn.BackgroundTransparency = 0.2
-                    okBtn.Text = "OK"
+                    okBtn.Text = lockType == "panda" and "Validar (Panda)" or "Confirmar"
                     okBtn.TextColor3 = Color3.fromRGB(255,255,255)
                     okBtn.Font = Enum.Font.GothamBold
-                    okBtn.TextSize = 11
-                    okBtn.ZIndex = 91
+                    okBtn.TextSize = 13
+                    okBtn.ZIndex = 97
                     okBtn.Parent = keyPopup
-                    Corner(okBtn, 4)
+                    Corner(okBtn, 6)
+                    okBtn.MouseEnter:Connect(function() CT(okBtn,{BackgroundTransparency=0},0.12) end)
+                    okBtn.MouseLeave:Connect(function() CT(okBtn,{BackgroundTransparency=0.2},0.12) end)
 
+                    -- Close popup when clicking dim overlay
+                    local dimBtn = Instance.new("TextButton")
+                    dimBtn.Size = UDim2.new(1,0,1,0); dimBtn.BackgroundTransparency=1; dimBtn.Text=""
+                    dimBtn.ZIndex = 95; dimBtn.Parent = popOverlay
+                    dimBtn.MouseButton1Click:Connect(ClosePopup)
+
+                    -- Validation logic
                     okBtn.MouseButton1Click:Connect(function()
-                        if tb.Text == lockKey then
-                            overlay:Destroy()
-                            keyPopup:Destroy(); keyPopup = nil
-                        else
-                            CT(tb, {BackgroundColor3 = T.Error}, 0.1)
-                            task.wait(0.4)
-                            CT(tb, {BackgroundColor3 = T.ComponentBg}, 0.2)
-                            tb.Text = ""
+                        local input = tb.Text:gsub("%s+","")
+                        if input == "" then
+                            statusLbl.Text = "Por favor, insira a key."; statusLbl.TextColor3 = T.Error; return
                         end
+                        okBtn.Text = "Verificando..."; statusLbl.Text = ""; statusLbl.TextColor3 = T.DimText
+
+                        task.spawn(function()
+                            local valid = false
+                            local msg   = "Key inválida."
+
+                            if lockType == "panda" and lockServiceID ~= "" then
+                                -- PandAuth V2 API
+                                local hwid = tostring(pcall(function()
+                                    return game:GetService("RbxAnalyticsService"):GetClientId()
+                                end) and game:GetService("RbxAnalyticsService"):GetClientId() or
+                                    tostring(game.Players.LocalPlayer.UserId))
+
+                                local url = string.format(
+                                    "https://pandadevelopment.net/v2_validation?service=%s&hwid=%s&key=%s",
+                                    lockServiceID, hwid, input)
+
+                                local ok, raw = pcall(function() return game:HttpGet(url, true) end)
+                                if ok then
+                                    local ok2, data = pcall(function()
+                                        return game:GetService("HttpService"):JSONDecode(raw)
+                                    end)
+                                    if ok2 and type(data) == "table" then
+                                        valid = data.V2_Authentication == true
+                                        msg   = valid and "✓ Key Panda válida!" or "✕ Key inválida ou expirada."
+                                    else
+                                        msg = "✕ Erro ao processar resposta."
+                                    end
+                                else
+                                    msg = "✕ Erro de rede."
+                                end
+                            else
+                                -- Fixed key comparison
+                                valid = (input == lockKey)
+                                msg   = valid and "✓ Desbloqueado!" or "✕ Key incorreta."
+                            end
+
+                            okBtn.Text = lockType == "panda" and "Validar (Panda)" or "Confirmar"
+
+                            if valid then
+                                statusLbl.Text = msg; statusLbl.TextColor3 = T.Success
+                                task.wait(0.5)
+                                ClosePopup()
+                                _UnlockKey(lockKey)  -- unlock ALL components with same key
+                            else
+                                statusLbl.Text = msg; statusLbl.TextColor3 = T.Error
+                                CT(ibg, {BackgroundColor3 = Color3.fromRGB(60, 20, 20)}, 0.1)
+                                task.wait(0.4)
+                                CT(ibg, {BackgroundColor3 = T.ComponentBg}, 0.2)
+                            end
+                        end)
                     end)
                 end)
             end
@@ -1512,7 +1706,7 @@ function SystemUI:CreateWindow(config)
                     if cfg.Callback then task.spawn(cfg.Callback) end
                 end)
 
-                if cfg.Locked or cfg.LockKey then ApplyLock(row, cfg.LockKey or "UNLOCK") end
+                if cfg.Locked or cfg.LockKey then ApplyLock(row, cfg) end
             end
 
             -- ----------------------------------------------------------------
@@ -1581,7 +1775,7 @@ function SystemUI:CreateWindow(config)
 
                 if cfg.Callback and state then task.spawn(cfg.Callback, state) end
 
-                if cfg.Locked or cfg.LockKey then ApplyLock(row, cfg.LockKey or "UNLOCK") end
+                if cfg.Locked or cfg.LockKey then ApplyLock(row, cfg) end
 
                 local ctrl = {}
                 function ctrl:Set(v)
@@ -1717,7 +1911,7 @@ function SystemUI:CreateWindow(config)
 
                 if cfg.Callback then task.spawn(cfg.Callback, val) end
 
-                if cfg.Locked or cfg.LockKey then ApplyLock(row, cfg.LockKey or "UNLOCK") end
+                if cfg.Locked or cfg.LockKey then ApplyLock(row, cfg) end
 
                 local ctrl = {}
                 function ctrl:Set(v)
