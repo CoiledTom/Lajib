@@ -1043,14 +1043,15 @@ function SystemUI:CreateWindow(config)
         RC(bLbl, "TextColor3", "Accent")
     end
 
-    -- Click zone (drag is on Bubble frame itself for clean separation)
+    -- Click zone — also serves as drag handle (on top, ZIndex 53)
     local bubbleBtn = Instance.new("TextButton")
     bubbleBtn.Size = UDim2.new(1, 0, 1, 0)
     bubbleBtn.BackgroundTransparency = 1
     bubbleBtn.Text = ""
     bubbleBtn.ZIndex = 53
     bubbleBtn.Parent = Bubble
-    MakeDraggable(Bubble, Bubble)   -- drag from the frame itself
+    -- Drag uses bubbleBtn as handle so input reaches it correctly
+    MakeDraggable(Bubble, bubbleBtn)
 
     -- Pulsing glow
     local function PulseGlow()
@@ -2050,8 +2051,8 @@ function SystemUI:CreateWindow(config)
                 cfgData[key]  = sel
 
                 local row  = BaseRow(36)
-                local xOff = RowIcon(row, cfg.Icon, 10)
-                RowLabel(row, cfg.Title or "Dropdown", xOff, 135, "Text")
+                -- Dropdowns não usam ícone na linha
+                RowLabel(row, cfg.Title or "Dropdown", 10, 135, "Text")
 
                 local ddBtn = Instance.new("TextButton")
                 ddBtn.Size = UDim2.new(0, 118, 0, 24)
@@ -2142,8 +2143,8 @@ function SystemUI:CreateWindow(config)
                 cfgData[key] = sel
 
                 local row  = BaseRow(36)
-                local xOff = RowIcon(row, cfg.Icon, 10)
-                RowLabel(row, cfg.Title or "Multi", xOff, 135, "Text")
+                -- Multi-dropdowns não usam ícone na linha
+                RowLabel(row, cfg.Title or "Multi", 10, 135, "Text")
 
                 local function SelTxt()
                     local t = {}
