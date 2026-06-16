@@ -402,31 +402,16 @@ local function Icon(parent, key, size, x, y, color)
 end
 
 -- =========================================================================
---  CONFIG  (readfile / writefile with in-memory fallback)
+--  CONFIG  (in-game _G memory — sem arquivos no celular)
 -- =========================================================================
-local _cfgCache = {}
+_G.SystemUI_Config = _G.SystemUI_Config or {}
 
 local function SaveConfig(name, data)
-    _cfgCache[name] = data
-    pcall(function()
-        if writefile then
-            writefile("SystemUI_"..name..".json",
-                game:GetService("HttpService"):JSONEncode(data))
-        end
-    end)
+    _G.SystemUI_Config[name] = data
 end
 
 local function LoadConfig(name)
-    local ok, raw = pcall(function()
-        if readfile then return readfile("SystemUI_"..name..".json") end
-    end)
-    if ok and raw then
-        local ok2, d = pcall(function()
-            return game:GetService("HttpService"):JSONDecode(raw)
-        end)
-        if ok2 and d then _cfgCache[name] = d; return d end
-    end
-    return _cfgCache[name] or {}
+    return _G.SystemUI_Config[name] or {}
 end
 
 -- =========================================================================
@@ -724,37 +709,14 @@ function SystemUI:CreateWindow(config)
     local conns       = {}
 
     -- -----------------------------------------------------------------------
-    --  LOCK KEY REGISTRY  (group unlock + persistence)
+    --  LOCK KEY REGISTRY  (_G — persiste na sessão do jogo sem arquivo)
     -- -----------------------------------------------------------------------
-    local _unlockedKeys = {}   -- key → true
-    local _lockOverlays = {}   -- key → {overlay, overlay, ...}
+    _G.SystemUI_Locks = _G.SystemUI_Locks or {}
+    local _unlockedKeys = _G.SystemUI_Locks
+    local _lockOverlays = {}  -- overlay refs (apenas desta janela/sessão)
 
-    -- Load previously saved unlock state
-    pcall(function()
-        if readfile then
-            local raw = readfile("SystemUI_Locks_" .. cfgName .. ".json")
-            if raw then
-                local ok, saved = pcall(function()
-                    return game:GetService("HttpService"):JSONDecode(raw)
-                end)
-                if ok and type(saved) == "table" then _unlockedKeys = saved end
-            end
-        end
-    end)
-
-    local function _SaveUnlocked()
-        pcall(function()
-            if writefile then
-                writefile("SystemUI_Locks_" .. cfgName .. ".json",
-                    game:GetService("HttpService"):JSONEncode(_unlockedKeys))
-            end
-        end)
-    end
-
-    -- Unlock all overlays sharing the same key
     local function _UnlockKey(key)
         _unlockedKeys[key] = true
-        _SaveUnlocked()
         local list = _lockOverlays[key] or {}
         for _, ov in ipairs(list) do
             if ov and ov.Parent then
@@ -996,40 +958,29 @@ function SystemUI:CreateWindow(config)
     local Bubble = Instance.new("Frame")
     Bubble.Name = "Bubble"
     Bubble.Size = UDim2.new(0, bSize, 0, bSize)
-    Bubble.Position = UDim2.new(0, 18, 0, 110)  -- left side, below top UI chrome
+    Bubble.Position = UDim2.new(0, 18, 0, 110)
     Bubble.BackgroundColor3 = T.Background
-    Bubble.BackgroundTransparency = 0.04
+    Bubble.BackgroundTransparency = 0.06
     Bubble.Visible = false
     Bubble.ZIndex = 50
     Bubble.ClipsDescendants = true
     Bubble.Parent = Gui
     Corner(Bubble, bSize / 2)
-    local bubbleStroke = Stroke(Bubble, T.Accent, 2, 0)
+    local bubbleStroke = Stroke(Bubble, T.Accent, 2, 0.15)
     RC(Bubble, "BackgroundColor3", "Background")
     RC(bubbleStroke, "Color", "Accent")
 
-    -- Outer glow ring
-    local bubbleGlow = Instance.new("Frame")
-    bubbleGlow.Size = UDim2.new(1, 10, 1, 10)
-    bubbleGlow.Position = UDim2.new(0, -5, 0, -5)
-    bubbleGlow.BackgroundColor3 = T.Accent
-    bubbleGlow.BackgroundTransparency = 0.82
-    bubbleGlow.ZIndex = 49
-    bubbleGlow.Parent = Bubble
-    Corner(bubbleGlow, (bSize + 10) / 2)
-    RC(bubbleGlow, "BackgroundColor3", "Accent")
-
-    -- Content: image OR text
+    -- Conteúdo: imagem OU texto
     if bImage then
         local bImg = Instance.new("ImageLabel")
-        bImg.Size = UDim2.new(1, -8, 1, -8)
-        bImg.Position = UDim2.new(0, 4, 0, 4)
+        bImg.Size = UDim2.new(1, -6, 1, -6)
+        bImg.Position = UDim2.new(0, 3, 0, 3)
         bImg.BackgroundTransparency = 1
         bImg.Image = bImage
         bImg.ScaleType = Enum.ScaleType.Fit
         bImg.ZIndex = 52
         bImg.Parent = Bubble
-        Corner(bImg, (bSize - 8) / 2)
+        Corner(bImg, (bSize - 6) / 2)
     else
         local bLbl = Instance.new("TextLabel")
         bLbl.Size = UDim2.new(1, 0, 1, 0)
@@ -1053,18 +1004,7 @@ function SystemUI:CreateWindow(config)
     -- Drag uses bubbleBtn as handle so input reaches it correctly
     MakeDraggable(Bubble, bubbleBtn)
 
-    -- Pulsing glow
-    local function PulseGlow()
-        if not Bubble.Visible then return end
-        CT(bubbleGlow, {BackgroundTransparency = 0.94}, 0.9, Enum.EasingStyle.Sine).Completed:Connect(function()
-            if not Bubble.Visible then return end
-            CT(bubbleGlow, {BackgroundTransparency = 0.68}, 0.9, Enum.EasingStyle.Sine).Completed:Connect(function()
-                PulseGlow()
-            end)
-        end)
-    end
-
-    -- Helper: restore from bubble/shrunk state
+    -- Helper: restore from bubble
     local function RestoreWindow()
         inBubbleMode = false
         CT(Bubble, {Size = UDim2.new(0, 0, 0, 0)}, 0.22, Enum.EasingStyle.Quart)
@@ -1150,8 +1090,6 @@ function SystemUI:CreateWindow(config)
         Bubble.Size = UDim2.new(0, 0, 0, 0)
         Bubble.Visible = true
         CT(Bubble, {Size = UDim2.new(0, bSize, 0, bSize)}, 0.42, Enum.EasingStyle.Back)
-        task.wait(0.2)
-        PulseGlow()
         visible = false
     end)
 
@@ -1293,6 +1231,10 @@ function SystemUI:CreateWindow(config)
         table.insert(Win._tabs, entry)
 
         local function Activate()
+            -- Salva posição de scroll da aba atual antes de trocar
+            if Win._activeTab and Win._activeTab ~= entry and Win._activeTab.Page then
+                Win._activeTab._savedScroll = Win._activeTab.Page.CanvasPosition
+            end
             for _, te in ipairs(Win._tabs) do
                 CT(te.Btn, {BackgroundTransparency = 0.55, BackgroundColor3 = T.ComponentBg}, 0.18)
                 CT(te.Lbl, {TextColor3 = T.DimText}, 0.18)
@@ -1303,7 +1245,10 @@ function SystemUI:CreateWindow(config)
             CT(TabLbl, {TextColor3 = T.Accent}, 0.18)
             if tabIconObj then CT(tabIconObj, {ImageColor3 = T.Accent}, 0.18) end
             Page.Visible = true
-            Page.CanvasPosition = Vector2.new(0,0)
+            -- Restaura posição de scroll salva (sem resetar pro topo)
+            task.defer(function()
+                Page.CanvasPosition = entry._savedScroll or Vector2.new(0, 0)
+            end)
             Win._activeTab = entry
         end
 
@@ -1413,35 +1358,16 @@ function SystemUI:CreateWindow(config)
 
             -- Lock overlay — center popup, group unlock, fixed/panda validation, key saved
             local function ApplyLock(row, cfg_lock)
-                local lockKey       = (type(cfg_lock) == "table") and cfg_lock.LockKey or cfg_lock
+                local lockKey       = (type(cfg_lock) == "table") and cfg_lock.LockKey       or cfg_lock
                 local lockType      = (type(cfg_lock) == "table") and (cfg_lock.LockType or "fixed"):lower() or "fixed"
                 local lockServiceID = (type(cfg_lock) == "table") and (cfg_lock.LockServiceID or "") or ""
+                local lockApiKey    = (type(cfg_lock) == "table") and (cfg_lock.LockApiKey    or "") or ""
                 local lockGetKeyURL = (type(cfg_lock) == "table") and (cfg_lock.LockGetKeyURL or "") or ""
 
                 if not lockKey then return end
+                if _unlockedKeys[lockKey] then return end  -- já desbloqueado nesta sessão
 
-                -- Check if already unlocked this session
-                if _unlockedKeys[lockKey] then return end
-
-                -- Check saved key from previous session
-                pcall(function()
-                    if readfile then
-                        local saved = readfile("SystemUI_Lock_" .. cfgName .. "_" .. lockKey .. ".key")
-                        if saved and saved ~= "" then
-                            -- Re-validate silently or just accept fixed key
-                            if lockType ~= "panda" then
-                                if saved == lockKey or lockType == "fixed" then
-                                    _unlockedKeys[lockKey] = true
-                                    return
-                                end
-                            end
-                            -- For panda, store for pre-filling input later
-                        end
-                    end
-                end)
-                if _unlockedKeys[lockKey] then return end
-
-                -- Register overlay for group-unlock
+                -- Registro de overlay para grupo-unlock
                 if not _lockOverlays[lockKey] then _lockOverlays[lockKey] = {} end
 
                 -- Build overlay
@@ -1655,12 +1581,12 @@ function SystemUI:CreateWindow(config)
                             local msg   = "Key inválida."
 
                             if lockType == "panda" and lockServiceID ~= "" then
-                                -- PandAuth — POST para API oficial
+                                -- PandAuth V2 — POST JSON com API Key
                                 local function HttpReq(opts)
-                                    if syn and syn.request       then return syn.request(opts)
-                                    elseif http and http.request then return http.request(opts)
-                                    elseif http_request          then return http_request(opts)
-                                    elseif request               then return request(opts) end
+                                    if syn  and syn.request       then return syn.request(opts)
+                                    elseif http and http.request  then return http.request(opts)
+                                    elseif http_request           then return http_request(opts)
+                                    elseif request                then return request(opts) end
                                 end
                                 local function GetHWID()
                                     local ok, h = pcall(gethwid)
@@ -1670,10 +1596,12 @@ function SystemUI:CreateWindow(config)
                                     end)
                                     return (ok2 and h2) or tostring(Players.LocalPlayer.UserId)
                                 end
+                                local headers = { ["Content-Type"] = "application/json" }
+                                if lockApiKey ~= "" then headers["x-api-key"] = lockApiKey end
                                 local ok, res = pcall(HttpReq, {
-                                    Url    = "https://new.pandadevelopment.net/api/v1/keys/validate",
-                                    Method = "POST",
-                                    Headers = { ["Content-Type"] = "application/json" },
+                                    Url     = "https://new.pandadevelopment.net/api/v1/keys/validate",
+                                    Method  = "POST",
+                                    Headers = headers,
                                     Body    = game:GetService("HttpService"):JSONEncode({
                                         ServiceID = lockServiceID,
                                         HWID      = GetHWID(),
@@ -1702,12 +1630,9 @@ function SystemUI:CreateWindow(config)
 
                             if valid then
                                 statusLbl.Text = msg; statusLbl.TextColor3 = T.Success
-                                -- Salva key pra não precisar redigitar
-                                pcall(function()
-                                    if writefile then
-                                        writefile("SystemUI_Lock_" .. cfgName .. "_" .. lockKey .. ".key", input)
-                                    end
-                                end)
+                                -- Salva no _G (sem arquivo no celular)
+                                _G.SystemUI_Locks = _G.SystemUI_Locks or {}
+                                _G.SystemUI_Locks[lockKey] = true
                                 task.wait(0.5)
                                 ClosePopup()
                                 _UnlockKey(lockKey)
@@ -2071,13 +1996,16 @@ function SystemUI:CreateWindow(config)
 
                 local open = false
                 local dropFrame = nil
+                local closeOverlay = nil
+
+                local function CloseDropdown()
+                    open = false
+                    if dropFrame then dropFrame:Destroy(); dropFrame = nil end
+                    if closeOverlay then closeOverlay:Destroy(); closeOverlay = nil end
+                end
 
                 ddBtn.MouseButton1Click:Connect(function()
-                    if open then
-                        open = false
-                        if dropFrame then dropFrame:Destroy(); dropFrame = nil end
-                        return
-                    end
+                    if open then CloseDropdown(); return end
                     open = true
                     local rp = row.AbsolutePosition - Main.AbsolutePosition
                     dropFrame = Instance.new("Frame")
@@ -2090,6 +2018,15 @@ function SystemUI:CreateWindow(config)
                     Corner(dropFrame, 6); Stroke(dropFrame, T.Accent, 1, 0.28)
                     ListLayout(dropFrame, Enum.FillDirection.Vertical, nil, 2)
                     Padding(dropFrame, 4, 4, 4, 4)
+
+                    -- Overlay invisível cobrindo toda a janela — fecha o dropdown ao clicar fora
+                    closeOverlay = Instance.new("TextButton")
+                    closeOverlay.Size = UDim2.new(1, 0, 1, 0)
+                    closeOverlay.BackgroundTransparency = 1
+                    closeOverlay.Text = ""
+                    closeOverlay.ZIndex = 79
+                    closeOverlay.Parent = Main
+                    closeOverlay.MouseButton1Click:Connect(CloseDropdown)
 
                     for _, opt in ipairs(opts) do
                         local ob = Instance.new("TextButton")
@@ -2105,17 +2042,12 @@ function SystemUI:CreateWindow(config)
                         Corner(ob, 4)
                         ob.Parent = dropFrame
 
-                        ob.MouseEnter:Connect(function()
-                            CT(ob, {BackgroundTransparency = 0.18}, 0.1)
-                        end)
-                        ob.MouseLeave:Connect(function()
-                            CT(ob, {BackgroundTransparency = opt == sel and 0.15 or 0.65}, 0.1)
-                        end)
+                        ob.MouseEnter:Connect(function() CT(ob, {BackgroundTransparency = 0.18}, 0.1) end)
+                        ob.MouseLeave:Connect(function() CT(ob, {BackgroundTransparency = opt == sel and 0.15 or 0.65}, 0.1) end)
                         ob.MouseButton1Click:Connect(function()
                             sel = opt; cfgData[key] = sel
                             ddBtn.Text = "  "..sel.."  ▾"
-                            open = false
-                            if dropFrame then dropFrame:Destroy(); dropFrame = nil end
+                            CloseDropdown()
                             AutoSave()
                             if cfg.Callback then task.spawn(cfg.Callback, sel) end
                         end)
@@ -2169,13 +2101,16 @@ function SystemUI:CreateWindow(config)
 
                 local open = false
                 local dropFrame = nil
+                local closeOverlay = nil
+
+                local function CloseMulti()
+                    open = false
+                    if dropFrame then dropFrame:Destroy(); dropFrame = nil end
+                    if closeOverlay then closeOverlay:Destroy(); closeOverlay = nil end
+                end
 
                 ddBtn.MouseButton1Click:Connect(function()
-                    if open then
-                        open = false
-                        if dropFrame then dropFrame:Destroy(); dropFrame = nil end
-                        return
-                    end
+                    if open then CloseMulti(); return end
                     open = true
                     local rp = row.AbsolutePosition - Main.AbsolutePosition
                     dropFrame = Instance.new("Frame")
@@ -2188,6 +2123,14 @@ function SystemUI:CreateWindow(config)
                     Corner(dropFrame, 6); Stroke(dropFrame, T.Accent, 1, 0.28)
                     ListLayout(dropFrame, Enum.FillDirection.Vertical, nil, 2)
                     Padding(dropFrame, 4, 4, 4, 4)
+
+                    closeOverlay = Instance.new("TextButton")
+                    closeOverlay.Size = UDim2.new(1, 0, 1, 0)
+                    closeOverlay.BackgroundTransparency = 1
+                    closeOverlay.Text = ""
+                    closeOverlay.ZIndex = 79
+                    closeOverlay.Parent = Main
+                    closeOverlay.MouseButton1Click:Connect(CloseMulti)
 
                     for _, opt in ipairs(opts) do
                         local ob = Instance.new("TextButton")
