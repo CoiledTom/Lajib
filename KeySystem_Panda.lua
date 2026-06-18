@@ -18,11 +18,15 @@
 -- ║                   CONFIGURAÇÃO  —  EDITE AQUI                        ║
 -- ╚══════════════════════════════════════════════════════════════════════╝
 
-local SERVICE_ID  = "SEU-SERVICE-ID-AQUI"
+-- Lê de _G.PandAuth_Config se disponível (set por Test scripts externos)
+local _ext = _G.PandAuth_Config or {}
+
+local SERVICE_ID  = _ext.ServiceID or "SEU-SERVICE-ID-AQUI"
 --  ↑ Service ID (Identifier) do seu projeto PandAuth
 --    Encontre em: https://dash.pandauth.com → seu projeto → Settings
+--    OU defina antes de carregar: _G.PandAuth_Config = { ServiceID="...", ApiKey="..." }
 
-local API_KEY     = "SUA-API-KEY-AQUI"
+local API_KEY     = _ext.ApiKey or "SUA-API-KEY-AQUI"
 --  ↑ API Key do seu projeto PandAuth
 --    Encontre em: https://dash.pandauth.com → seu projeto → Settings → API Key
 

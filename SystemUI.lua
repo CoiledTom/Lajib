@@ -683,6 +683,52 @@ local function SendConfirm(cfg, T)
 end
 local SystemUI = {}
 
+-- Global PandAuth config (setado 1x no início — usado por todos os Lock Components)
+local _pandaConfig = {}
+
+-- Helper: HWID universal
+local function GetHWID()
+    local ok, h = pcall(gethwid)
+    if ok and h then return h end
+    local ok2, h2 = pcall(function()
+        return tostring(game:GetService("RbxAnalyticsService"):GetClientId()):gsub("-","")
+    end)
+    return (ok2 and h2 and h2 ~= "") and h2 or tostring(game.Players.LocalPlayer.UserId)
+end
+
+-- Helper HTTP universal
+local function HttpReq(opts)
+    if syn and syn.request       then return syn.request(opts)
+    elseif http and http.request then return http.request(opts)
+    elseif http_request          then return http_request(opts)
+    elseif request               then return request(opts) end
+    error("Executor não suporta request customizado.")
+end
+
+-- SafeClick: dispara callback só se não houver arrasto (mobile-safe)
+-- Evita que scroll acidental acione botões
+local function SafeClick(element, callback, threshold)
+    threshold = threshold or 8
+    element.InputBegan:Connect(function(i)
+        if i.UserInputType ~= Enum.UserInputType.MouseButton1
+        and i.UserInputType ~= Enum.UserInputType.Touch then return end
+        local startPos = i.Position
+        local moved    = false
+        local mc = game:GetService("UserInputService").InputChanged:Connect(function(mi)
+            if mi.UserInputType == Enum.UserInputType.Touch
+            or mi.UserInputType == Enum.UserInputType.MouseMovement then
+                if (mi.Position - startPos).Magnitude > threshold then moved = true end
+            end
+        end)
+        i.Changed:Connect(function()
+            if i.UserInputState == Enum.UserInputState.End then
+                mc:Disconnect()
+                if not moved then task.spawn(callback) end
+            end
+        end)
+    end)
+end
+
 function SystemUI:CreateWindow(config)
     config = config or {}
     local wTitle      = config.Title       or "SYSTEM INTERFACE"
@@ -1146,6 +1192,15 @@ function SystemUI:CreateWindow(config)
         _cfgName = cfgName, _cfgData = cfgData,
     }
 
+    -- Define credenciais PandAuth globais (uma vez no início do script)
+    function Win:SetPandaAuth(cfg)
+        _pandaConfig = cfg or {}
+    end
+
+    function Win:GetHWID()
+        return GetHWID()
+    end
+
     function Win:Notify(c)    SendNotif(c, T) end
     function Win:SaveConfig() SaveConfig(cfgName, cfgData) end
     function Win:LoadConfig() return LoadConfig(cfgName) end
@@ -1252,7 +1307,8 @@ function SystemUI:CreateWindow(config)
             Win._activeTab = entry
         end
 
-        TabBtn.MouseButton1Click:Connect(Activate)
+        -- SafeClick no tab (mobile-safe)
+        SafeClick(TabBtn, Activate)
         TabBtn.MouseEnter:Connect(function()
             if Win._activeTab ~= entry then
                 CT(TabBtn, {BackgroundTransparency = 0.3, BackgroundColor3 = T.TabHover}, 0.14)
@@ -1360,9 +1416,13 @@ function SystemUI:CreateWindow(config)
             local function ApplyLock(row, cfg_lock)
                 local lockKey       = (type(cfg_lock) == "table") and cfg_lock.LockKey       or cfg_lock
                 local lockType      = (type(cfg_lock) == "table") and (cfg_lock.LockType or "fixed"):lower() or "fixed"
+                local lockPassword  = (type(cfg_lock) == "table") and (cfg_lock.LockPassword  or lockKey) or lockKey
+                -- Panda: usa cfg do componente; se vazio, cai no SetPandaAuth global
                 local lockServiceID = (type(cfg_lock) == "table") and (cfg_lock.LockServiceID or "") or ""
                 local lockApiKey    = (type(cfg_lock) == "table") and (cfg_lock.LockApiKey    or "") or ""
                 local lockGetKeyURL = (type(cfg_lock) == "table") and (cfg_lock.LockGetKeyURL or "") or ""
+                if lockServiceID == "" then lockServiceID = _pandaConfig.ServiceID or "" end
+                if lockApiKey    == "" then lockApiKey    = _pandaConfig.ApiKey    or "" end
 
                 if not lockKey then return end
                 if _unlockedKeys[lockKey] then return end  -- já desbloqueado nesta sessão
@@ -1622,7 +1682,8 @@ function SystemUI:CreateWindow(config)
                                     msg = "✕ Erro de rede (PandAuth)."
                                 end
                             else
-                                valid = (input == lockKey)
+                                -- Compara com LockPassword (ou LockKey como fallback)
+                                valid = (input == lockPassword)
                                 msg   = valid and "✓ Desbloqueado!" or "✕ Key incorreta."
                             end
 
@@ -1691,12 +1752,11 @@ function SystemUI:CreateWindow(config)
                     CT(row, {BackgroundTransparency = 0.38, BackgroundColor3 = T.ComponentBg}, 0.14)
                     CT(sk, {Transparency = 0.85}, 0.14)
                 end)
-                row.InputBegan:Connect(function(i)
-                    if i.UserInputType ~= Enum.UserInputType.MouseButton1
-                    and i.UserInputType ~= Enum.UserInputType.Touch then return end
+                -- SafeClick: não dispara em scroll acidental (mobile-safe)
+                SafeClick(row, function()
                     CT(row, {BackgroundColor3 = T.AccentDim}, 0.08)
                     task.delay(0.14, function()
-                        if row.Parent then CT(row, {BackgroundColor3 = T.TabHover}, 0.1) end
+                        if row.Parent then CT(row, {BackgroundColor3 = T.ComponentBg}, 0.1) end
                     end)
                     if cfg.Callback then task.spawn(cfg.Callback) end
                 end)
@@ -1753,12 +1813,8 @@ function SystemUI:CreateWindow(config)
                     if cfg.Callback then task.spawn(cfg.Callback, state) end
                 end
 
-                row.InputBegan:Connect(function(i)
-                    if i.UserInputType == Enum.UserInputType.MouseButton1
-                    or i.UserInputType == Enum.UserInputType.Touch then
-                        Toggle()
-                    end
-                end)
+                -- SafeClick no toggle (mobile-safe)
+                SafeClick(row, Toggle)
                 row.MouseEnter:Connect(function()
                     CT(row, {BackgroundTransparency = 0.08}, 0.14)
                     CT(sk, {Transparency = 0.3}, 0.14)
